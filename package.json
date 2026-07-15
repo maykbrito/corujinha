@@ -2,9 +2,28 @@
   "name": "see-and-talk",
   "version": "1.0.0",
   "description": "AI that see your screen and talk with you",
-  "main": "main.js",
+  "main": "out/main/index.js",
   "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "electron-builder install-app-deps"
+  },
   "devDependencies": {
-    "electron": "^43.1.1"
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.1",
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "typescript": "^7.0.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.10"
+  },
+  "dependencies": {
+    "@openai/agents-realtime": "^0.13.4",
+    "better-sqlite3": "^12.11.1"
   }
 }
