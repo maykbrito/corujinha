@@ -22,10 +22,16 @@ see-and-talk/
   electron.vite.config.ts         # main/preload/renderer build
   tsconfig.json                   # TS config
   vitest.config.ts                # test config (node env)
+  resources/
+    trayTemplate.png              # 16x16 template menu-bar icon
   src/
     shared/
       ipcChannels.ts              # IPC channel-name constants
       types.ts                    # shared domain + IPC payload types
+      session/                    # PURE logic, imported by BOTH main and renderer
+        sessionState.ts           # pure start/pause/stop state machine
+        pagination.ts             # pure turn pagination
+        realtimeEvents.ts         # pure Realtime-event -> domain mapping
     main/
       index.ts                    # app lifecycle + orchestration
       ipc.ts                      # registers IPC handlers -> services
@@ -41,17 +47,13 @@ see-and-talk/
         settingsWindow.ts
         captureWorker.ts          # hidden offscreen capture+encode window
       history/
-        db.ts                     # connection + migration runner
+        db.ts                     # connection + schema bootstrap (schema imported ?raw)
         schema.sql                # tables + FTS5
         historyStore.ts           # repository (sessions/turns/captures/search)
-      session/
-        sessionState.ts           # pure start/pause/stop state machine
-        pagination.ts             # pure turn pagination
-        realtimeEvents.ts         # pure Realtime-event -> domain mapping
     preload/
       index.ts                    # contextBridge API surface
     renderer/
-      notch/{index.html, main.ts, realtime.ts, tools.ts, ui.ts, styles.css}
+      notch/{index.html, main.ts, realtime.ts, ui.ts, styles.css}
       dashboard/{index.html, main.ts, styles.css}
       settings/{index.html, main.ts, styles.css}
       captureWorker/{index.html, main.ts}
@@ -63,6 +65,11 @@ see-and-talk/
     main/keyStore.test.ts
 ```
 
+> **Note on pure `session/` modules:** they live in `src/shared/session/` because **both** the main
+> process (persistence, IPC) and the notch renderer (WebRTC wrapper, UI) import them. Import via the
+> `@shared/session/...` alias everywhere — never copy them, and never use a cross-tree
+> `@shared/../main/...` path.
+
 ---
 
 ## Chunk 1: Project scaffold & tooling
@@ -73,7 +80,7 @@ see-and-talk/
 
 **Files:**
 - Modify: `package.json`
-- Create: `tsconfig.json`, `vitest.config.ts`, `.nvmrc`
+- Create: `tsconfig.json`, `vitest.config.ts`
 
 - [ ] **Step 1: Install toolchain**
 
@@ -124,7 +131,7 @@ export default defineConfig({
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   }
@@ -134,7 +141,7 @@ export default defineConfig({
 - [ ] **Step 5: Verify Vitest runs (no tests yet)**
 
 Run: `npm test`
-Expected: Vitest reports "No test files found" and exits 0 (or add a trivial passing test temporarily). If exit is non-zero, pass `--passWithNoTests` in the script.
+Expected: Vitest reports "No test files found" and exits 0 (thanks to `--passWithNoTests`).
 
 - [ ] **Step 6: Commit**
 
@@ -211,6 +218,7 @@ export const IPC = {
   HISTORY_END_SESSION: "history:endSession",
   HISTORY_ADD_TURN: "history:addTurn",
   HISTORY_ADD_CAPTURE: "history:addCapture",
+  HISTORY_SET_CAPTURE_SUMMARY: "history:setCaptureSummary",
   HISTORY_LIST_SESSIONS: "history:listSessions",
   HISTORY_LIST_TURNS: "history:listTurns",
   HISTORY_SEARCH: "history:search",
@@ -220,6 +228,8 @@ export const IPC = {
   TOKEN_MINT: "token:mint",
   // capture
   CAPTURE_SCREEN: "capture:screen",
+  // notch window control
+  NOTCH_SET_FOCUSABLE: "notch:setFocusable",
   // permissions
   PERM_STATUS: "perm:status",
   PERM_REQUEST: "perm:request",
@@ -261,6 +271,11 @@ git commit -m "feat: shared IPC channel names and domain types"
 
 **Files:**
 - Create: `src/main/index.ts`, `src/main/windows/notchWindow.ts`, `src/main/tray.ts`, `src/preload/index.ts`, `src/renderer/notch/index.html`, `src/renderer/notch/main.ts`, `src/renderer/notch/styles.css`
+- Create: `resources/trayTemplate.png` (16×16 template icon)
+
+- [ ] **Step 0: Add a tray icon asset**
+
+Create a simple 16×16 (and @2x 32×32) black-on-transparent PNG named `resources/trayTemplate.png`. macOS treats files ending in `Template` as template images (auto light/dark). If you don't have art, generate a plain filled circle PNG — anything non-empty so the menu-bar item is visible. Ensure electron-vite copies `resources/` into the build (add it to `build.rollupOptions` assets or reference via `app.getAppPath()`), or load it with an absolute path from `process.resourcesPath` in production.
 
 - [ ] **Step 1: Notch window factory**
 
@@ -296,14 +311,30 @@ export function createNotchWindow(): BrowserWindow {
 }
 ```
 
+> **`focusable: false` vs the type box:** a non-focusable window can't receive keyboard input, which
+> the Chunk 6 type box needs. We keep `focusable:false` by default (so listening never steals focus)
+> and temporarily call `win.setFocusable(true)` + `win.focus()` while the type box is active, then
+> revert on blur. This toggle is wired via IPC in Chunk 6 (Task 6.3). Do not "fix" it by making the
+> window permanently focusable.
+
 - [ ] **Step 2: Tray**
 
 ```ts
 // src/main/tray.ts
 import { Tray, Menu, nativeImage, app } from "electron";
+import { join } from "path";
+
+function trayIcon() {
+  const dev = !!process.env["ELECTRON_RENDERER_URL"];
+  const path = dev ? join(app.getAppPath(), "resources/trayTemplate.png")
+                   : join(process.resourcesPath, "trayTemplate.png");
+  const img = nativeImage.createFromPath(path);
+  img.setTemplateImage(true);
+  return img;
+}
 
 export function createTray(handlers: { openDashboard: () => void; openSettings: () => void }): Tray {
-  const tray = new Tray(nativeImage.createEmpty()); // TODO: replace with real icon asset
+  const tray = new Tray(trayIcon());
   tray.setToolTip("See-and-Talk");
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: "Dashboard", click: handlers.openDashboard },
@@ -439,48 +470,44 @@ git add src/main/history/schema.sql
 git commit -m "feat: SQLite schema for sessions, turns, captures, FTS5 search"
 ```
 
-### Task 2.2: DB connection + migration runner
+### Task 2.2: DB connection + schema bootstrap
 
 **Files:**
 - Create: `src/main/history/db.ts`
 
-- [ ] **Step 1: Write the connection helper**
+The schema must be **bundled**, not read from disk at runtime (a runtime `readFileSync(__dirname/schema.sql)` breaks in the electron-vite production bundle — the `.sql` file isn't copied next to `out/main/index.js`). Import it as a raw string via Vite's `?raw` suffix so it's inlined at build time. Tests can still pass a schema override.
+
+- [ ] **Step 1: Declare the `?raw` module type** (so TS accepts the import)
+
+```ts
+// src/shared/raw.d.ts
+declare module "*.sql?raw" { const content: string; export default content; }
+```
+
+- [ ] **Step 2: Write the connection helper**
 
 ```ts
 // src/main/history/db.ts
 import Database from "better-sqlite3";
-import { readFileSync } from "fs";
-import { join } from "path";
+import schemaSql from "./schema.sql?raw"; // inlined at build time by electron-vite
 
-export function openDatabase(filePath: string): Database.Database {
+export function openDatabase(filePath: string, schemaOverride?: string): Database.Database {
   const db = new Database(filePath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
-  const schema = readFileSync(join(__dirname, "schema.sql"), "utf8");
-  db.exec(schema);
+  db.exec(schemaOverride ?? schemaSql);
   return db;
 }
 ```
 
-Note for tests: tests import `schema.sql` via a path that works in Vitest. To avoid `__dirname` issues under Vitest, `openDatabase` takes an optional `schemaSql` override; the test passes the schema string directly.
+Tests call `openDatabase(":memory:", schema)` with the schema string they read directly, so they
+never depend on bundler behavior. Production calls `openDatabase(path)` and uses the inlined schema.
 
-Revise `db.ts`:
-```ts
-export function openDatabase(filePath: string, schemaSql?: string): Database.Database {
-  const db = new Database(filePath);
-  db.pragma("journal_mode = WAL");
-  db.pragma("foreign_keys = ON");
-  const schema = schemaSql ?? readFileSync(join(__dirname, "schema.sql"), "utf8");
-  db.exec(schema);
-  return db;
-}
-```
-
-- [ ] **Step 2: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/main/history/db.ts
-git commit -m "feat: SQLite connection + schema bootstrap"
+git add src/main/history/db.ts src/shared/raw.d.ts
+git commit -m "feat: SQLite connection + build-inlined schema bootstrap"
 ```
 
 ### Task 2.3: HistoryStore repository (TDD)
@@ -547,6 +574,24 @@ describe("HistoryStore", () => {
     expect(store.search("cache").length).toBe(1);
     expect(store.search("nonexistentword").length).toBe(0);
   });
+
+  it("stores a capture then attaches a summary later (note_screen fallback path)", () => {
+    const s = store.startSession("m");
+    const c = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/c.webp", summary: "" });
+    expect(store.search("kubernetes").length).toBe(0);
+    store.setCaptureSummary(c.id, "a kubernetes cluster diagram");
+    expect(store.search("kubernetes").length).toBe(1);
+  });
+
+  it("sanitizes FTS input so special characters and empty queries never throw", () => {
+    const s = store.startSession("m");
+    store.addTurn({ sessionId: s.id, role: "user", source: "typed", text: `use a "quoted" term and a-hyphen` });
+    expect(() => store.search(`"`)).not.toThrow();
+    expect(() => store.search(`a-hyphen`)).not.toThrow();
+    expect(() => store.search(`*`)).not.toThrow();
+    expect(store.search("   ")).toEqual([]);   // whitespace/empty -> no query, empty result
+    expect(store.search("quoted").length).toBe(1);
+  });
 });
 ```
 
@@ -603,6 +648,19 @@ export class HistoryStore {
     return { ...c, summary: c.summary ?? "", id, createdAt: now };
   }
 
+  // Attach/replace a capture's summary (produced by the note_screen tool, possibly after the row exists).
+  setCaptureSummary(captureId: number, summary: string): void {
+    const row = this.db.prepare("SELECT session_id as sessionId, created_at as createdAt FROM captures WHERE id=?").get(captureId) as { sessionId: number; createdAt: number } | undefined;
+    if (!row) return;
+    this.db.prepare("UPDATE captures SET summary=? WHERE id=?").run(summary, captureId);
+    this.db.prepare("DELETE FROM search_fts WHERE kind='capture' AND ref_id=?").run(captureId);
+    if (summary) {
+      this.db.prepare(
+        "INSERT INTO search_fts (body, kind, ref_id, session_id, created_at) VALUES (?, 'capture', ?, ?, ?)"
+      ).run(summary, captureId, row.sessionId, row.createdAt);
+    }
+  }
+
   listSessions(): Session[] {
     return this.db.prepare("SELECT id, mode, model, started_at as startedAt, ended_at as endedAt, status FROM sessions ORDER BY id DESC").all() as Session[];
   }
@@ -614,9 +672,11 @@ export class HistoryStore {
   }
 
   search(query: string): SearchHit[] {
+    const match = toFtsMatch(query);
+    if (match === null) return []; // empty/whitespace -> no query
     const rows = this.db.prepare(
       "SELECT kind, ref_id as refId, session_id as sessionId, created_at as createdAt, snippet(search_fts, 0, '[', ']', '…', 8) as snippet FROM search_fts WHERE search_fts MATCH ? ORDER BY rank"
-    ).all(query) as Array<{ kind: string; refId: number; sessionId: number; createdAt: number; snippet: string }>;
+    ).all(match) as Array<{ kind: string; refId: number; sessionId: number; createdAt: number; snippet: string }>;
     return rows.map(r => ({
       turnId: r.kind === "turn" ? r.refId : null,
       captureId: r.kind === "capture" ? r.refId : null,
@@ -626,12 +686,20 @@ export class HistoryStore {
     }));
   }
 }
+
+// Turn arbitrary user text into a safe FTS5 phrase query: strip control chars, wrap as a
+// double-quoted phrase (escaping internal quotes), so operators like * - " never cause syntax errors.
+function toFtsMatch(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  return `"${trimmed.replace(/"/g, '""')}"`;
+}
 ```
 
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `npx vitest run tests/history/historyStore.test.ts`
-Expected: PASS (5 tests). If FTS `MATCH` throws on a bare word, confirm the query is a single token; special characters must be quoted — handled in Chunk 7's search input sanitizer.
+Expected: PASS (all 7 tests). Search input is sanitized inside `search()` via `toFtsMatch`, so special characters and empty queries never throw `MATCH` syntax errors.
 
 - [ ] **Step 5: Commit**
 
@@ -802,13 +870,20 @@ git commit -m "feat: mint ephemeral Realtime client secret from stored key"
 
 ```ts
 // src/main/permissions.ts
-import { systemPreferences } from "electron";
+import { systemPreferences, shell } from "electron";
 import type { PermissionStatus } from "@shared/types";
+
+// getMediaAccessStatus can return granted|denied|restricted|not-determined|unknown.
+// Collapse restricted/unknown -> denied for our tri-state.
+function norm(s: string): PermissionStatus["microphone"] {
+  if (s === "granted" || s === "denied" || s === "not-determined") return s;
+  return "denied";
+}
 
 export function permissionStatus(): PermissionStatus {
   return {
-    microphone: systemPreferences.getMediaAccessStatus("microphone") as PermissionStatus["microphone"],
-    screen: systemPreferences.getMediaAccessStatus("screen") as PermissionStatus["screen"],
+    microphone: norm(systemPreferences.getMediaAccessStatus("microphone")),
+    screen: norm(systemPreferences.getMediaAccessStatus("screen")),
   };
 }
 
@@ -817,7 +892,6 @@ export async function requestMicrophone(): Promise<boolean> {
 }
 // Screen recording cannot be requested programmatically; deep-link to System Settings.
 export function openScreenRecordingSettings(): void {
-  const { shell } = require("electron");
   shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
 }
 ```
@@ -980,7 +1054,7 @@ git commit -m "feat: ScreenCapturer round-trips worker frames and persists thumb
 ### Task 5.1: Turn pagination
 
 **Files:**
-- Create: `src/main/session/pagination.ts`
+- Create: `src/shared/session/pagination.ts`
 - Test: `tests/session/pagination.test.ts`
 
 - [ ] **Step 1: Failing test**
@@ -988,7 +1062,7 @@ git commit -m "feat: ScreenCapturer round-trips worker frames and persists thumb
 ```ts
 // tests/session/pagination.test.ts
 import { describe, it, expect } from "vitest";
-import { clampIndex, pageFor } from "../../src/main/session/pagination";
+import { clampIndex, pageFor } from "../../src/shared/session/pagination";
 
 describe("pagination", () => {
   it("clamps index within bounds", () => {
@@ -1017,7 +1091,7 @@ Run: `npx vitest run tests/session/pagination.test.ts`
 - [ ] **Step 3: Implement**
 
 ```ts
-// src/main/session/pagination.ts
+// src/shared/session/pagination.ts
 export function clampIndex(i: number, total: number): number {
   if (total <= 0) return 0;
   return Math.max(0, Math.min(i, total - 1));
@@ -1034,14 +1108,14 @@ export function pageFor<T>(items: T[], index: number): Page<T> {
 - [ ] **Step 4: Run — expect PASS**, then commit
 
 ```bash
-git add src/main/session/pagination.ts tests/session/pagination.test.ts
+git add src/shared/session/pagination.ts tests/session/pagination.test.ts
 git commit -m "feat: pure turn pagination (tested)"
 ```
 
 ### Task 5.2: Session state machine
 
 **Files:**
-- Create: `src/main/session/sessionState.ts`
+- Create: `src/shared/session/sessionState.ts`
 - Test: `tests/session/sessionState.test.ts`
 
 States: `idle → active ⇄ paused → ended`. Transitions: `start`, `pause`, `resume`, `stop`. Invalid transitions throw.
@@ -1051,7 +1125,7 @@ States: `idle → active ⇄ paused → ended`. Transitions: `start`, `pause`, `
 ```ts
 // tests/session/sessionState.test.ts
 import { describe, it, expect } from "vitest";
-import { transition } from "../../src/main/session/sessionState";
+import { transition } from "../../src/shared/session/sessionState";
 
 describe("sessionState", () => {
   it("starts from idle", () => {
@@ -1077,7 +1151,7 @@ describe("sessionState", () => {
 - [ ] **Step 3: Implement**
 
 ```ts
-// src/main/session/sessionState.ts
+// src/shared/session/sessionState.ts
 export type SessionStatus = "idle" | "active" | "paused" | "ended";
 export type SessionAction = "start" | "pause" | "resume" | "stop";
 
@@ -1098,14 +1172,14 @@ export function transition(state: SessionStatus, action: SessionAction): Session
 - [ ] **Step 4: Run — expect PASS**, then commit
 
 ```bash
-git add src/main/session/sessionState.ts tests/session/sessionState.test.ts
+git add src/shared/session/sessionState.ts tests/session/sessionState.test.ts
 git commit -m "feat: pure session state machine (tested)"
 ```
 
 ### Task 5.3: Realtime event → domain mapping
 
 **Files:**
-- Create: `src/main/session/realtimeEvents.ts`
+- Create: `src/shared/session/realtimeEvents.ts`
 - Test: `tests/session/realtimeEvents.test.ts`
 
 The Realtime API emits server events; we map the ones we persist into `Turn`/tool intents. This isolates event-shape knowledge from the WebRTC glue so it's testable. (Event names per the spec's referenced docs: `response.output_audio_transcript.done` → assistant turn; `conversation.item.input_audio_transcription.completed` → user voice turn; function-call events → tool intents.)
@@ -1115,7 +1189,7 @@ The Realtime API emits server events; we map the ones we persist into `Turn`/too
 ```ts
 // tests/session/realtimeEvents.test.ts
 import { describe, it, expect } from "vitest";
-import { mapServerEvent } from "../../src/main/session/realtimeEvents";
+import { mapServerEvent } from "../../src/shared/session/realtimeEvents";
 
 describe("mapServerEvent", () => {
   it("maps a completed user audio transcription to a user voice turn", () => {
@@ -1145,7 +1219,7 @@ describe("mapServerEvent", () => {
 - [ ] **Step 3: Implement**
 
 ```ts
-// src/main/session/realtimeEvents.ts
+// src/shared/session/realtimeEvents.ts
 export type MappedEvent =
   | { kind: "turn"; role: "user" | "assistant"; source: "voice" | "typed"; text: string }
   | { kind: "note_screen"; summary: string; callId: string }
@@ -1179,7 +1253,7 @@ Note: exact event names/fields must be reconciled with the live API during Chunk
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/session/realtimeEvents.ts tests/session/realtimeEvents.test.ts
+git add src/shared/session/realtimeEvents.ts tests/session/realtimeEvents.test.ts
 git commit -m "feat: pure Realtime-event to domain mapping (tested)"
 ```
 
@@ -1207,7 +1281,7 @@ import { makeElectronKeyStore } from "./keyStore";
 import { mintEphemeralToken } from "./tokenMinter";
 import { permissionStatus, requestMicrophone } from "./permissions";
 
-export function registerIpc(deps: { history: HistoryStore; capturer: ScreenCapturer }) {
+export function registerIpc(deps: { history: HistoryStore; capturer: ScreenCapturer; getNotch: () => import("electron").BrowserWindow | null }) {
   const keys = makeElectronKeyStore();
 
   ipcMain.handle(IPC.KEY_GET_STATUS, () => keys.status());
@@ -1226,9 +1300,12 @@ export function registerIpc(deps: { history: HistoryStore; capturer: ScreenCaptu
   ipcMain.handle(IPC.HISTORY_END_SESSION, (_e, id: number) => deps.history.endSession(id));
   ipcMain.handle(IPC.HISTORY_ADD_TURN, (_e, t) => deps.history.addTurn(t));
   ipcMain.handle(IPC.HISTORY_ADD_CAPTURE, (_e, c) => deps.history.addCapture(c));
+  ipcMain.handle(IPC.HISTORY_SET_CAPTURE_SUMMARY, (_e, id: number, summary: string) => deps.history.setCaptureSummary(id, summary));
   ipcMain.handle(IPC.HISTORY_LIST_SESSIONS, () => deps.history.listSessions());
   ipcMain.handle(IPC.HISTORY_LIST_TURNS, (_e, id: number) => deps.history.listTurns(id));
   ipcMain.handle(IPC.HISTORY_SEARCH, (_e, q: string) => deps.history.search(q));
+
+  ipcMain.handle(IPC.NOTCH_SET_FOCUSABLE, (_e, on: boolean) => { deps.getNotch()?.setFocusable(on); if (on) deps.getNotch()?.focus(); });
 
   ipcMain.handle(IPC.PERM_STATUS, () => permissionStatus());
   ipcMain.handle(IPC.PERM_REQUEST, () => requestMicrophone());
@@ -1256,9 +1333,9 @@ app.whenReady().then(() => {
   const history = new HistoryStore(db);
   const worker = createCaptureWorker();
   const capturer = new ScreenCapturer(worker);
-  registerIpc({ history, capturer });
-
   notch = createNotchWindow();
+  registerIpc({ history, capturer, getNotch: () => notch });
+
   createTray({ openDashboard: () => {}, openSettings: () => {} }); // wired in Chunk 7
 });
 
@@ -1277,53 +1354,58 @@ git commit -m "feat: main IPC surface wiring history, capture, key, token, permi
 ### Task 6.2: Realtime WebRTC client (notch renderer)
 
 **Files:**
-- Create: `src/renderer/notch/realtime.ts`, `src/renderer/notch/tools.ts`
+- Create: `src/renderer/notch/realtime.ts`
 
-Use `@openai/agents-realtime` (`RealtimeSession` + WebRTC transport). Configure `semantic_vad`, register the two tools, and forward server events to the persistence + UI layer. Confirm the SDK's exact API against its README during implementation; the shape below is the intended structure.
+Use `@openai/agents-realtime` (`RealtimeSession` + WebRTC transport). Configure `semantic_vad`, register the two tools, and forward server events to the persistence + UI layer. The exact SDK method names (`sendMessage`, `mute`, `transport.sendEvent`, tool registration) and Realtime event field names must be confirmed against the installed SDK version — but every unknown is isolated behind the already-tested `mapServerEvent` mapper and the `HistoryStore` IPC, so the buildable core does not change if names differ. All capture calls are guarded so a capture failure degrades to audio-only (never an unhandled rejection). The current DB session id is held in a **mutable** `let` so Chunk 8's reconnect can repoint it.
 
-- [ ] **Step 1: Tool definitions + handlers**
+- [ ] **Step 1: Define the two tool schemas**
 
 ```ts
-// src/renderer/notch/tools.ts
-const api = (window as any).api;
-
-// note_screen: model records what it saw -> persist to captures.summary.
-export async function handleNoteScreen(sessionId: number, summary: string, lastThumbPath: string | null) {
-  await api.invoke("history:addCapture", { sessionId, turnId: null, thumbPath: lastThumbPath ?? "", summary });
-}
-
-// capture_screen ("look again"): grab a fresh frame, return a data URL to inject.
-export async function captureScreen(): Promise<{ dataUrl: string; thumbPath: string }> {
-  return api.invoke("capture:screen");
-}
+// tool schemas passed to RealtimeAgent.tools (adjust wrapper to the SDK's tool() helper if provided)
+const noteScreenTool = {
+  type: "function",
+  name: "note_screen",
+  description: "Record a one-to-two sentence summary of what the user's screen currently shows. Call this whenever you are given a new screenshot.",
+  parameters: {
+    type: "object",
+    properties: { summary: { type: "string", description: "Brief description of the visible screen." } },
+    required: ["summary"],
+  },
+};
+const captureScreenTool = {
+  type: "function",
+  name: "capture_screen",
+  description: "Request a fresh screenshot of the user's screen when you need an updated look before answering.",
+  parameters: { type: "object", properties: {}, additionalProperties: false },
+};
 ```
 
-- [ ] **Step 2: Realtime session wrapper**
+- [ ] **Step 2: Realtime session wrapper (guarded capture, capture-row + summary, pause/resume, mutable session id)**
 
 ```ts
 // src/renderer/notch/realtime.ts
 import { RealtimeSession, RealtimeAgent } from "@openai/agents-realtime";
-import { mapServerEvent } from "@shared/../main/session/realtimeEvents"; // or copy mapper into shared
+import { mapServerEvent } from "@shared/session/realtimeEvents";
 const api = (window as any).api;
 
 export interface ConverseHooks {
-  onAssistantText(text: string): void;   // for notch display
+  onAssistantText(text: string): void;
   onUserText(text: string): void;
-  onStatus(s: string): void;
+  onStatus(s: string): void;       // "connected" | "reconnecting" | "capture-failed" | ...
 }
 
 export async function startConverse(hooks: ConverseHooks) {
   const token = await api.invoke("token:mint");
-  const sessionRow = await api.invoke("history:startSession", "gpt-realtime-2.1");
-  let lastThumb: string | null = null;
+  let currentSessionId: number = (await api.invoke("history:startSession", "gpt-realtime-2.1")).id;
+  let lastCaptureId: number | null = null;
 
   const agent = new RealtimeAgent({
     name: "See-and-Talk",
     instructions:
-      "You are a study companion who can see the user's screen. When given a new screenshot, " +
-      "briefly call note_screen(summary) describing what it shows. Use capture_screen when you need a fresh look. " +
-      "Be concise and Socratic.",
-    tools: [/* note_screen, capture_screen tool schemas per SDK */],
+      "You are a Socratic study companion who can see the user's screen. Whenever you are given a " +
+      "new screenshot, call note_screen(summary) with a one-to-two sentence description of what it " +
+      "shows. Call capture_screen when you need a fresh look before answering. Keep replies concise.",
+    tools: [noteScreenTool, captureScreenTool],
   });
 
   const session = new RealtimeSession(agent, {
@@ -1332,44 +1414,66 @@ export async function startConverse(hooks: ConverseHooks) {
     config: { audio: { input: { turnDetection: { type: "semantic_vad" } }, output: { voice: "marin" } } },
   });
 
-  session.on("transport_event", async (ev: any) => {
-    const mapped = mapServerEvent(ev);
-    if (!mapped) return;
-    if (mapped.kind === "turn") {
-      await api.invoke("history:addTurn", { sessionId: sessionRow.id, role: mapped.role, source: mapped.source, text: mapped.text });
-      mapped.role === "assistant" ? hooks.onAssistantText(mapped.text) : hooks.onUserText(mapped.text);
-    } else if (mapped.kind === "note_screen") {
-      await api.invoke("history:addCapture", { sessionId: sessionRow.id, turnId: null, thumbPath: lastThumb ?? "", summary: mapped.summary });
-    } else if (mapped.kind === "capture_screen") {
-      const shot = await api.invoke("capture:screen"); lastThumb = shot.thumbPath;
-      await injectImage(session, shot.dataUrl);
+  // Capture the screen, persist a captures row immediately (empty summary = fallback), inject the image.
+  // Returns without throwing on failure; signals the UI instead.
+  async function captureAndInject(): Promise<void> {
+    try {
+      const shot = await api.invoke("capture:screen"); // { dataUrl, thumbPath }
+      const cap = await api.invoke("history:addCapture", { sessionId: currentSessionId, turnId: null, thumbPath: shot.thumbPath, summary: "" });
+      lastCaptureId = cap.id;
+      injectImage(session, shot.dataUrl);
+    } catch (e) {
+      hooks.onStatus("capture-failed"); // proceed audio-only for this turn
     }
-  });
+  }
+
+  session.on("transport_event", (ev: any) => { void handleServerEvent(ev); });
+
+  async function handleServerEvent(ev: any) {
+    try {
+      // Race mitigation: capture when the user STARTS speaking, so the image is already in
+      // context by the time semantic_vad auto-creates the response after they stop.
+      if (ev?.type === "input_audio_buffer.speech_started") { await captureAndInject(); return; }
+
+      const mapped = mapServerEvent(ev);
+      if (!mapped) return;
+      if (mapped.kind === "turn") {
+        await api.invoke("history:addTurn", { sessionId: currentSessionId, role: mapped.role, source: mapped.source, text: mapped.text });
+        mapped.role === "assistant" ? hooks.onAssistantText(mapped.text) : hooks.onUserText(mapped.text);
+      } else if (mapped.kind === "note_screen") {
+        if (lastCaptureId != null) await api.invoke("history:setCaptureSummary", lastCaptureId, mapped.summary);
+        else await api.invoke("history:addCapture", { sessionId: currentSessionId, turnId: null, thumbPath: "", summary: mapped.summary });
+      } else if (mapped.kind === "capture_screen") {
+        await captureAndInject();
+        session.transport.sendEvent({ type: "response.create" }); // answer using the fresh frame
+      }
+    } catch { /* never let a handler rejection go unhandled */ }
+  }
 
   await session.connect({ apiKey: token.value });
   hooks.onStatus("connected");
 
   return {
-    sessionId: sessionRow.id,
+    getSessionId: () => currentSessionId,
+    setSessionId: (id: number) => { currentSessionId = id; }, // used by reconnect (Chunk 8)
     async sendText(text: string) {
-      await api.invoke("history:addTurn", { sessionId: sessionRow.id, role: "user", source: "typed", text });
+      await api.invoke("history:addTurn", { sessionId: currentSessionId, role: "user", source: "typed", text });
+      await captureAndInject();
       session.sendMessage(text);
     },
-    async attachScreenshot() {
-      const shot = await api.invoke("capture:screen"); lastThumb = shot.thumbPath;
-      await injectImage(session, shot.dataUrl);
-    },
     async askNow() {
-      await this.attachScreenshot();
+      await captureAndInject();
       session.sendMessage("Please respond about what you currently see on my screen.");
     },
     mute(on: boolean) { session.mute(on); },
-    async stop() { await session.close(); await api.invoke("history:endSession", sessionRow.id); },
+    pause() { session.mute(true); },          // stop feeding mic; session stays warm
+    resume() { session.mute(false); },
+    async stop() { await session.close(); await api.invoke("history:endSession", currentSessionId); },
+    _session: session, _setLastCaptureNull: () => { lastCaptureId = null; },
   };
 }
 
-async function injectImage(session: any, dataUrl: string) {
-  // Add an input_image conversation item, then request a response.
+function injectImage(session: any, dataUrl: string) {
   session.transport.sendEvent({
     type: "conversation.item.create",
     item: { type: "message", role: "user", content: [{ type: "input_image", image_url: dataUrl }] },
@@ -1377,15 +1481,18 @@ async function injectImage(session: any, dataUrl: string) {
 }
 ```
 
-Note: the exact `@openai/agents-realtime` method names (`sendMessage`, `mute`, `transport.sendEvent`, tool registration) must be confirmed against the installed SDK version; adjust the wrapper accordingly. The persistence + mapping seam (already tested) does not change.
+Key points this closes from review:
+- **Every capture writes a `captures` row** (empty-summary fallback); `note_screen` then fills it via `setCaptureSummary` — no orphaned thumbnails, capture always persisted/searchable.
+- **Capture failures are caught** → audio-only turn + `capture-failed` status, never an unhandled rejection.
+- **Per-turn vision wins the race**: captured on `speech_started`, before `semantic_vad` creates the response.
+- **`currentSessionId` is mutable** so reconnect (Chunk 8) can repoint it.
+- **`transport_event` handler body is wrapped** so no rejection escapes.
 
-- [ ] **Step 3: Per-turn auto-capture** — inject a fresh screenshot before each user turn. Simplest reliable approach: on `input_audio_buffer.speech_stopped` (or the SDK's turn-start event), call `attachScreenshot()` so the image is present when the model responds. Wire this in the `transport_event` handler.
-
-- [ ] **Step 4: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/renderer/notch/realtime.ts src/renderer/notch/tools.ts
-git commit -m "feat: WebRTC Realtime converse session with per-turn capture and tools"
+git add src/renderer/notch/realtime.ts
+git commit -m "feat: WebRTC Realtime converse session — guarded per-turn capture, tools, pause/resume"
 ```
 
 ### Task 6.3: Notch live UI (controls, pagination, type box)
@@ -1394,11 +1501,11 @@ git commit -m "feat: WebRTC Realtime converse session with per-turn capture and 
 - Modify: `src/renderer/notch/main.ts`, `src/renderer/notch/index.html`, `src/renderer/notch/styles.css`
 - Create: `src/renderer/notch/ui.ts`
 
-- [ ] **Step 1: Build the UI** — render current turn (paginated via the tested `pageFor`), Start/Pause/Stop, Mute, Ask now, type box, Prev/Next, and a "dashboard" link. Collapsed (idle) vs expanded (has content) states per the approved mock. Use `-webkit-app-region: drag` on the panel background and `no-drag` on interactive controls. Keep click-through off while the notch shows content; the notch is a small window (not full-screen), so desktop interaction elsewhere is unaffected.
+- [ ] **Step 1: Build the UI** — render current turn (paginated via the tested `pageFor`), Start/Pause/Stop, Mute, Ask now, type box, Prev/Next, and a "dashboard" link. Collapsed (idle) vs expanded (has content) states per the approved mock. Use `-webkit-app-region: drag` on the panel background and `no-drag` on interactive controls. The notch is a small window (not full-screen), so desktop interaction elsewhere is unaffected.
 
 ```ts
 // src/renderer/notch/ui.ts (skeleton)
-import { pageFor } from "@shared/../main/session/pagination"; // or shared copy
+import { pageFor } from "@shared/session/pagination";
 import type { Turn } from "@shared/types";
 
 export function renderNotch(root: HTMLElement, state: { turns: Turn[]; index: number; status: string }, actions: {
@@ -1406,26 +1513,28 @@ export function renderNotch(root: HTMLElement, state: { turns: Turn[]; index: nu
   sendText(t: string): void; prev(): void; next(): void; openDashboard(): void;
 }) {
   const page = pageFor(state.turns, state.index);
-  // ... build DOM: answer text = page.item?.text, disable Prev if !page.hasPrev, etc.
+  // ... build DOM: answer text = page.item?.text, disable Prev if !page.hasPrev, disable Next if !page.hasNext, etc.
 }
 ```
 
-- [ ] **Step 2: Wire `main.ts`** to `startConverse` hooks: assistant/user text pushes a turn into local state and re-renders at the newest index; controls call the session wrapper.
+- [ ] **Step 2: Drive controls through the tested state machine** — hold `status: SessionStatus` in `main.ts` and route Start/Pause/Stop/resume through `transition()` from `@shared/session/sessionState`; reject invalid presses (e.g. Pause while idle) using its thrown error to keep buttons consistent. Map states to session-wrapper calls: `start`→`startConverse`, `pause`→`converse.pause()`, `resume`→`converse.resume()`, `stop`→`converse.stop()`. Assistant/user text hooks push a turn into local state and re-render at the newest index.
 
-- [ ] **Step 3: Smoke — the core end-to-end** (requires API key set via devtools `await window.api.invoke("key:set","sk-...")` until Settings exists, plus mic + screen-recording permission granted in System Settings):
+- [ ] **Step 3: Type-box focus handling** — the notch window is `focusable:false`, so on the type box `focus` event call `api.invoke("notch:setFocusable", true)` and on `blur` call `api.invoke("notch:setFocusable", false)`. This lets you type without the window stealing focus while merely listening. Enter submits (`sendText`), which also triggers a capture.
+
+- [ ] **Step 4: Smoke — the core end-to-end** (requires API key set via devtools `await window.api.invoke("key:set","sk-...")` until Settings exists, plus mic + screen-recording permission granted in System Settings):
   - Click Start → status "connected"; speak → your transcript appears as a user turn and the AI replies **by voice** and as an assistant turn.
   - Draw/change something on screen, ask about it → the reply reflects the current screen (per-turn capture working).
   - Click **Ask now** with no speech → AI comments on the current screen.
-  - Type in the box → AI responds.
+  - Type in the box → AI responds (type box gains focus via the `notch:setFocusable` toggle).
   - **Prev/Next** page through turns; notch stays small.
-  - **Mute** stops it hearing you; **Stop** ends the session.
-  - Confirm rows exist: `await window.api.invoke("history:listTurns", <id>)` and files under `userData/captures/`.
+  - **Pause** stops it hearing you and the session stays warm; resume continues without a reconnect. **Mute** silences the mic; **Stop** ends the session.
+  - Confirm rows exist: `await window.api.invoke("history:listTurns", <id>)`, a `captures` row per capture (empty summary until `note_screen` fills it), and files under `userData/captures/`.
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/renderer/notch
-git commit -m "feat: live notch UI — paginated turns, controls, type box, Ask now"
+git commit -m "feat: live notch UI — paginated turns, state-machine controls, type box, Ask now"
 ```
 
 ---
@@ -1441,7 +1550,7 @@ git commit -m "feat: live notch UI — paginated turns, controls, type box, Ask 
 
 - [ ] **Step 1: Window factory** — normal resizable `BrowserWindow` loading `dashboard/index.html`; created lazily, focused if already open.
 
-- [ ] **Step 2: Renderer** — a search box + results list. On input (debounced), call `history:search`; render snippets grouped by session. Clicking a session lists its turns via `history:listTurns`. Sanitize the FTS query (wrap the user's text as a quoted string, e.g. `"${q.replace(/"/g,'""')}"`) to avoid FTS5 syntax errors — this closes the note flagged in Chunk 2 Step 4.
+- [ ] **Step 2: Renderer** — a search box + results list. On input (debounced, skipping empty/whitespace), call `history:search`; render snippets grouped by session. Clicking a session lists its turns via `history:listTurns`. FTS input sanitization already lives in the tested `HistoryStore.search()` (`toFtsMatch`), so the renderer passes raw text — no per-caller escaping needed.
 
 - [ ] **Step 3: Smoke** — after a Converse session exists, open Dashboard from tray, search a word you said, see a hit, click through to the transcript.
 
@@ -1476,19 +1585,23 @@ git commit -m "feat: settings/onboarding — API key, permissions"
 - Create: `src/main/shortcuts.ts`
 - Modify: `src/main/index.ts`, `src/main/tray.ts`
 
-- [ ] **Step 1: Shortcuts** — register `globalShortcut` for Ask now, toggle mute/listen, show/hide notch; forward to the notch via `webContents.send`. Defaults e.g. `Cmd+Shift+A` (Ask now), `Cmd+Shift+M` (mute), `Cmd+Shift+H` (show/hide). Unregister on quit.
+- [ ] **Step 1: Shortcuts** — register `globalShortcut` for Ask now, toggle mute/listen (renderer-targeted, since the session lives there) and show/hide notch (main-targeted, since showing/hiding an OS window — and re-showing a `focusable:false` one — is a main-process job). Defaults: `Cmd+Shift+A` (Ask now), `Cmd+Shift+M` (mute), `Cmd+Shift+H` (show/hide). Unregister all on `will-quit`.
 
 ```ts
 // src/main/shortcuts.ts
-import { globalShortcut } from "electron";
-export function registerShortcuts(send: (channel: string) => void) {
-  globalShortcut.register("CommandOrControl+Shift+A", () => send("hotkey:askNow"));
-  globalShortcut.register("CommandOrControl+Shift+M", () => send("hotkey:toggleMute"));
-  globalShortcut.register("CommandOrControl+Shift+H", () => send("hotkey:toggleNotch"));
+import { globalShortcut, BrowserWindow } from "electron";
+
+export function registerShortcuts(deps: { sendToNotch: (channel: string) => void; toggleNotch: () => void }) {
+  globalShortcut.register("CommandOrControl+Shift+A", () => deps.sendToNotch("hotkey:askNow"));
+  globalShortcut.register("CommandOrControl+Shift+M", () => deps.sendToNotch("hotkey:toggleMute"));
+  globalShortcut.register("CommandOrControl+Shift+H", () => deps.toggleNotch()); // main handles show/hide
 }
+export function unregisterShortcuts() { globalShortcut.unregisterAll(); }
 ```
 
-- [ ] **Step 2: Wire tray** `openDashboard`/`openSettings` to the window factories; wire shortcut registration in `app.whenReady`; handle the `hotkey:*` events in the notch renderer.
+Main provides `toggleNotch`: `if (notch.isVisible()) notch.hide(); else notch.show();`.
+
+- [ ] **Step 2: Wire tray + shortcuts** — connect tray `openDashboard`/`openSettings` to the window factories (tray icon already resolved in Task 1.4); register shortcuts in `app.whenReady` passing `sendToNotch` (via `notch.webContents.send`) and `toggleNotch`; call `unregisterShortcuts()` on `will-quit`. Handle `hotkey:askNow`/`hotkey:toggleMute` in the notch renderer.
 
 - [ ] **Step 3: Smoke** — tray opens both windows; each shortcut triggers its action while another app is focused.
 
@@ -1510,14 +1623,14 @@ git commit -m "feat: tray actions and global shortcuts (ask now, mute, show/hide
 **Files:**
 - Modify: `src/renderer/notch/realtime.ts`
 
-- [ ] **Step 1: Detect end/drop** — listen for the session close/error event. On close that isn't user-initiated Stop, transparently: mint a new token, open a new Realtime session, and seed it with a short context summary drawn from recent turns (`history:listTurns`, last N). Keep the same SQLite `sessions` row semantics: finalize the old row, start a new one, but present it as one continuous conversation in the notch (the turns list already spans both in the UI state).
-- [ ] **Step 2: Surface state** — show a subtle "reconnecting…" status in the notch; return to "connected" after reseed.
-- [ ] **Step 3: Smoke (abbreviated)** — simulate by forcing `session.close()` from devtools; confirm auto-reconnect and that new turns keep persisting; confirm no unhandled rejection.
+- [ ] **Step 1: Detect end/drop** — listen for the session close/error event. On a close that isn't a user-initiated Stop, reconnect transparently **under the same DB session row**: the 60-min limit is on the Realtime *connection*, not our history. Mint a fresh token, open a new `RealtimeSession`, and seed it by reading recent turns of the current session (`history:listTurns(currentSessionId)`, last N) and adding them as prior context items. Do **not** create a new `sessions` row and do **not** call `setSessionId` — keep `currentSessionId` unchanged so all turns (before and after) stay in one session, and the Dashboard shows a single continuous conversation. (`setSessionId` exists only as a hook for future modes; v1 reconnect leaves it untouched.) Guard against reconnect storms with a short backoff and a "user pressed Stop" flag so Stop doesn't trigger a reconnect.
+- [ ] **Step 2: Surface state** — show a subtle "reconnecting…" status in the notch (via `onStatus`); return to "connected" after reseed.
+- [ ] **Step 3: Smoke (abbreviated)** — force `session.close()` from devtools (not via Stop); confirm auto-reconnect, that new turns keep persisting to the **same** session id, and that the Dashboard lists exactly one session spanning both halves. Confirm no unhandled rejection.
 - [ ] **Step 4: Commit**
 
 ```bash
 git add src/renderer/notch/realtime.ts
-git commit -m "feat: auto-reconnect on session cap/drop with history-seeded continuity"
+git commit -m "feat: auto-reconnect on cap/drop under the same session (history-seeded)"
 ```
 
 ### Task 8.2: Error surfaces
@@ -1525,7 +1638,7 @@ git commit -m "feat: auto-reconnect on session cap/drop with history-seeded cont
 **Files:**
 - Modify: `src/renderer/notch/main.ts`, `src/main/ipc.ts`
 
-- [ ] **Step 1:** No API key → Start disabled + "Set up in Settings". Token-mint failure → notch shows an error with a Retry. Capture failure → the turn proceeds audio-only (already handled by the wrapper catching `capture:screen` rejection); log and continue. Missing screen-recording → notch badge "screen not shared — enable in Settings", conversation still works voice-only.
+- [ ] **Step 1:** No API key → Start disabled + "Set up in Settings". Token-mint failure → notch shows an error with a Retry. Capture failure → the turn proceeds audio-only: the guard already lives in `captureAndInject` (Task 6.2), which emits the `capture-failed` status — here, render that status as a transient badge and continue. Missing screen-recording → notch badge "screen not shared — enable in Settings"; conversation still works voice-only.
 - [ ] **Step 2: Smoke** — remove the key file and launch: onboarding path. Provide a bad key: mint failure surfaces with Retry. Deny screen recording: voice still works, badge shown.
 - [ ] **Step 3: Commit**
 
@@ -1551,7 +1664,7 @@ Expected: typecheck clean; all Vitest suites pass (historyStore, pagination, ses
   7. Mute → it stops hearing you; unmute → resumes.
   8. Open Dashboard → search a spoken word → hit → open transcript.
   9. Stop → session finalized; reopen Dashboard → session listed with all turns and captures.
-  10. Leave a session running past a forced reconnect → history intact, conversation continues.
+  10. Leave a session running past a forced reconnect → history intact, conversation continues under one session.
 
 - [ ] **Step 3: Commit any fixes found during smoke**
 
@@ -1561,10 +1674,14 @@ git commit -am "fix: issues found during full smoke pass"
 
 ---
 
+## Known v1 deviations from spec (intentional)
+
+- **Shortcut editing deferred.** Spec §6/§4.2 says shortcuts are "configurable in settings"; v1 ships fixed defaults and displays them (no editor). Editing is a small follow-up, not a v1 blocker.
+
 ## Done criteria
 
-- `npm run typecheck && npm test` green.
+- `npm run typecheck && npm test` green (suites: historyStore, pagination, sessionState, realtimeEvents, keyStore).
 - The full smoke checklist (Task 8.3) passes on a clean profile.
-- Every user/assistant turn and every capture (with summary) is persisted and searchable.
-- The notch is a small, draggable, resizable panel that never blocks desktop interaction.
-- No API key, bad key, denied permission, and mid-session reconnect all degrade gracefully.
+- Every user/assistant turn and every capture is persisted (empty-summary fallback) and searchable; `note_screen` summaries attach to their capture row.
+- The notch is a small, draggable, resizable panel that never blocks desktop interaction; the type box accepts input via the focusable toggle.
+- No API key, bad key, denied permission, capture failure, and mid-session reconnect all degrade gracefully; reconnect keeps a single continuous session.
