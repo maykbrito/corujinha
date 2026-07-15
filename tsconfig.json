@@ -8,8 +8,7 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "types": ["node"],
-    "baseUrl": ".",
-    "paths": { "@shared/*": ["src/shared/*"] },
+    "paths": { "@shared/*": ["./src/shared/*"] },
     "outDir": "out"
   },
   "include": ["src", "tests"]
