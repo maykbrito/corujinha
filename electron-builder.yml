@@ -1,0 +1,40 @@
+appId: com.maykbrito.seeandtalk
+productName: See-and-Talk
+directories:
+  output: dist
+  buildResources: build
+
+# electron-vite outputs the compiled app to out/. Ship that + package.json.
+files:
+  - out/**/*
+  - package.json
+
+# tray.ts (production) reads icons from process.resourcesPath, so copy resources/
+# into the app bundle's Resources directory.
+extraResources:
+  - from: resources
+    to: .
+    filter:
+      - "**/*"
+
+# Rebuild native modules (better-sqlite3) against the packaged Electron.
+npmRebuild: true
+asarUnpack:
+  - "**/*.node"
+
+mac:
+  category: public.app-category.productivity
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  # Local/personal build: ad-hoc sign (identity: null), no notarization.
+  # Gatekeeper will require right-click > Open the first launch.
+  identity: null
+  hardenedRuntime: false
+  # Usage strings so macOS can prompt for Microphone. Screen Recording is a
+  # separate TCC permission triggered at runtime (no Info.plist key needed).
+  extendInfo:
+    NSMicrophoneUsageDescription: "See-and-Talk listens to your microphone so you can talk with the AI."
+    NSCameraUsageDescription: "See-and-Talk does not use the camera."
+    LSUIElement: true # menu-bar/tray app, no Dock icon

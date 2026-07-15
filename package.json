@@ -9,6 +9,8 @@
     "dev": "electron-vite dev",
     "prebuild": "electron-builder install-app-deps",
     "build": "electron-vite build",
+    "predist": "npm run build",
+    "dist": "electron-builder --mac",
     "pretest": "npm rebuild better-sqlite3",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
