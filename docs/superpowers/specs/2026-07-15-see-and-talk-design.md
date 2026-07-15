@@ -90,8 +90,9 @@ v1 has one engine: a **WebRTC Realtime session** in the notch renderer.
   silences the mic (privacy kill switch).
 - **Text in:** typed messages are sent as `input_text` conversation items.
 - **Vision:** on every user turn, and on "Ask now," a fresh whole-screen **WebP** screenshot is
-  injected as `input_image` content before the response. The model can also pull a fresh frame
-  mid-turn via the **`capture_screen`** ("look again") tool.
+  injected as `input_image` content before issuing `response.create` (so "Ask now" produces a
+  spoken reply even with no words). The model can also pull a fresh frame mid-turn via the
+  **`capture_screen`** ("look again") tool.
 - **Screen summaries:** the model calls **`note_screen(summary)`** to record what a new screen
   shows (§4.4).
 
@@ -167,6 +168,7 @@ Thumbnails are written to `userData/captures/`; only the path + summary live in 
 - **Stop** — end session, finalize it in history.
 - **Mute** — silence mic input quickly (privacy kill switch).
 - **Ask now** — capture the screen and ask the AI to respond about it, no words needed.
+- **Type box** — enter a text message instead of speaking (sent as `input_text`).
 - **Prev / Next** — page through turns in the notch.
 - **Global shortcuts** — Ask now, toggle listen/mute, show/hide notch (configurable in settings).
 
