@@ -31,6 +31,8 @@ export async function startConverse(hooks: ConverseHooks) {
   const token = await api.invoke("token:mint");
   let currentSessionId: number = (await api.invoke("history:startSession", "gpt-realtime-2.1")).id;
   let lastCaptureId: number | null = null;
+  // The user's mute intent, tracked so pause/resume can't silently reopen a muted mic.
+  let userMuted = false;
 
   // Assigned below once the session exists; the tool `execute` closures reference it,
   // but only run at conversation time, long after assignment.
@@ -169,21 +171,19 @@ export async function startConverse(hooks: ConverseHooks) {
       session.sendMessage("Please respond about what you currently see on my screen.");
     },
     mute(on: boolean) {
+      userMuted = on;
       session.mute(on);
     },
     pause() {
       session.mute(true);
     }, // pause == mute the mic; kept distinct for the Pause control + state machine
     resume() {
-      session.mute(false);
+      // Restore the user's mute intent — never force the mic open on resume.
+      session.mute(userMuted);
     },
     async stop() {
       session.close();
       await api.invoke("history:endSession", currentSessionId);
-    },
-    _session: session,
-    _setLastCaptureNull: () => {
-      lastCaptureId = null;
     },
   };
 }

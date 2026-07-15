@@ -16,6 +16,9 @@ let muted = false;
 let turns: Turn[] = [];
 let index = 0;
 let converse: Converse | null = null;
+// Bumped on every start/stop so a Stop pressed *during* connect can invalidate the
+// in-flight session and close it (otherwise it leaks a live mic after "stopped").
+let startGeneration = 0;
 
 function render() {
   const state: NotchState = { turns, index, status, statusLabel, muted };
@@ -42,18 +45,28 @@ function pushTurn(t: Turn) {
 const actions: NotchActions = {
   async start() {
     if (!tryTransition("start")) return;
+    const gen = ++startGeneration;
     statusLabel = "connecting…";
     render();
     try {
-      converse = await startConverse({
+      const c = await startConverse({
         onAssistantText: (text) => pushTurn(makeTurn("assistant", text)),
         onUserText: (text) => pushTurn(makeTurn("user", text)),
         onStatus: (s) => {
+          if (gen !== startGeneration) return; // ignore a superseded session
           statusLabel = s;
           render();
         },
       });
+      if (gen !== startGeneration) {
+        // Stop (or a new start) happened while connecting — close the now-orphaned
+        // live session instead of leaking an open mic.
+        await c.stop();
+        return;
+      }
+      converse = c;
     } catch (e) {
+      if (gen !== startGeneration) return; // a newer action owns the state
       // Failed to connect (no key, mint failure, etc.) — fall back to idle.
       status = "idle";
       statusLabel = `error: ${String(e)}`;
@@ -73,6 +86,7 @@ const actions: NotchActions = {
   },
   async stop() {
     if (!tryTransition("stop")) return;
+    startGeneration++; // invalidate any in-flight start
     await converse?.stop();
     converse = null;
     status = "idle"; // ready to start a new session
@@ -88,10 +102,10 @@ const actions: NotchActions = {
     render();
   },
   askNow() {
-    converse?.askNow();
+    converse?.askNow().catch(() => {});
   },
   sendText(t) {
-    converse?.sendText(t);
+    converse?.sendText(t).catch(() => {});
   },
   prev() {
     index = Math.max(0, index - 1);
