@@ -1,0 +1,6 @@
+node_modules/
+.superpowers/
+dist/
+out/
+.DS_Store
+*.log

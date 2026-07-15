@@ -1,0 +1,10 @@
+{
+  "name": "see-and-talk",
+  "version": "1.0.0",
+  "description": "AI that see your screen and talk with you",
+  "main": "main.js",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.1.1"
+  }
+}
