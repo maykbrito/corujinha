@@ -160,6 +160,7 @@ export async function startConverse(hooks: ConverseHooks) {
     }, // used by reconnect (Chunk 8)
     async sendText(text: string) {
       await api.invoke("history:addTurn", { sessionId: currentSessionId, role: "user", source: "typed", text });
+      hooks.onUserText(text); // surface the typed message in the notch, like voice turns
       await captureAndInject(false);
       session.sendMessage(text);
     },
