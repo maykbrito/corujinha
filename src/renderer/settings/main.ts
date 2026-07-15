@@ -25,9 +25,15 @@ async function refreshKeyStatus() {
 saveKeyBtn.addEventListener("click", async () => {
   const key = keyInput.value.trim();
   if (!key) return;
-  await api.invoke("key:set", key);
-  keyInput.value = "";
-  await refreshKeyStatus();
+  try {
+    await api.invoke("key:set", key);
+    keyInput.value = "";
+    keyStatusEl.textContent = "Saving…";
+    await refreshKeyStatus();
+  } catch (e) {
+    keyStatusEl.textContent = "Could not save key: " + String(e);
+    keyStatusEl.className = "status warn";
+  }
 });
 
 async function refreshPermissions() {

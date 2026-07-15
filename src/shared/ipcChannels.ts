@@ -8,6 +8,7 @@ export const IPC = {
   HISTORY_SET_CAPTURE_SUMMARY: "history:setCaptureSummary",
   HISTORY_LIST_SESSIONS: "history:listSessions",
   HISTORY_LIST_TURNS: "history:listTurns",
+  HISTORY_LIST_CAPTURES: "history:listCaptures",
   HISTORY_SEARCH: "history:search",
   // auth/config
   KEY_GET_STATUS: "key:status",
@@ -15,6 +16,7 @@ export const IPC = {
   TOKEN_MINT: "token:mint",
   // capture
   CAPTURE_SCREEN: "capture:screen",
+  CAPTURE_THUMB: "capture:thumb", // read a stored thumbnail file -> data URL (dashboard)
   // notch window control
   NOTCH_SET_FOCUSABLE: "notch:setFocusable",
   // permissions

@@ -66,6 +66,12 @@ export class HistoryStore {
     ).all(sessionId) as Turn[];
   }
 
+  listCaptures(sessionId: number): Capture[] {
+    return this.db.prepare(
+      "SELECT id, session_id as sessionId, turn_id as turnId, thumb_path as thumbPath, summary, created_at as createdAt FROM captures WHERE session_id=? ORDER BY id ASC"
+    ).all(sessionId) as Capture[];
+  }
+
   search(query: string): SearchHit[] {
     const match = toFtsMatch(query);
     if (match === null) return []; // empty/whitespace -> no query

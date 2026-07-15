@@ -1,5 +1,7 @@
 // src/main/ipc.ts
-import { ipcMain, BrowserWindow } from "electron";
+import { ipcMain, BrowserWindow, app } from "electron";
+import { join, resolve } from "path";
+import { existsSync, readFileSync } from "fs";
 import { IPC, IPC_EVENT } from "@shared/ipcChannels";
 import type { HistoryStore } from "./history/historyStore";
 import type { ScreenCapturer } from "./screenCapturer";
@@ -43,7 +45,21 @@ export function registerIpc(deps: {
   );
   ipcMain.handle(IPC.HISTORY_LIST_SESSIONS, () => deps.history.listSessions());
   ipcMain.handle(IPC.HISTORY_LIST_TURNS, (_e, id: number) => deps.history.listTurns(id));
+  ipcMain.handle(IPC.HISTORY_LIST_CAPTURES, (_e, id: number) => deps.history.listCaptures(id));
   ipcMain.handle(IPC.HISTORY_SEARCH, (_e, q: string) => deps.history.search(q));
+
+  // Read a stored capture thumbnail into a data URL for the dashboard. Restricted to the
+  // app's captures directory so a renderer can't read arbitrary files.
+  ipcMain.handle(IPC.CAPTURE_THUMB, (_e, thumbPath: string): string | null => {
+    try {
+      const dir = join(app.getPath("userData"), "captures");
+      const resolved = resolve(thumbPath);
+      if (!resolved.startsWith(dir) || !existsSync(resolved)) return null;
+      return "data:image/webp;base64," + readFileSync(resolved).toString("base64");
+    } catch {
+      return null;
+    }
+  });
 
   ipcMain.handle(IPC.NOTCH_SET_FOCUSABLE, (_e, on: boolean) => {
     const notch = deps.getNotch();

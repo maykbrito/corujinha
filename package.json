@@ -5,9 +5,8 @@
   "main": "out/main/index.js",
   "license": "MIT",
   "scripts": {
-    "predev": "electron-builder install-app-deps",
+    "predev": "electron-rebuild -f -w better-sqlite3",
     "dev": "electron-vite dev",
-    "prebuild": "electron-builder install-app-deps",
     "build": "electron-vite build",
     "predist": "npm run build",
     "dist": "electron-builder --mac",

@@ -5,18 +5,21 @@ import { join } from "path";
 export function createNotchWindow(): BrowserWindow {
   const { width } = screen.getPrimaryDisplay().workAreaSize;
   const win = new BrowserWindow({
-    width: 360,
-    height: 220,
-    x: Math.round(width / 2 - 180),
+    width: 420,
+    height: 300,
+    minWidth: 300,
+    minHeight: 160,
+    x: Math.round(width / 2 - 210),
     y: 0,
     frame: false,
     transparent: true,
-    resizable: true,
+    resizable: true, // native edge-resize; the panel no longer covers edges with a drag region
     hasShadow: false,
-    focusable: false,
+    // Focusable so the type box can receive keyboard input. It only activates the app when
+    // you click it (to type) — voice-only use never clicks it, so it doesn't steal focus.
+    focusable: true,
     skipTaskbar: true,
     alwaysOnTop: true,
-    type: "panel", // macOS: non-activating panel so listening never steals app focus
     webPreferences: { preload: join(__dirname, "../preload/index.js") },
   });
   win.setAlwaysOnTop(true, "screen-saver");

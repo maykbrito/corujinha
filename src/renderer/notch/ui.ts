@@ -51,13 +51,14 @@ const cache = new WeakMap<HTMLElement, Refs>();
 function build(root: HTMLElement, actions: NotchActions): Refs {
   root.innerHTML = `
     <div id="panel">
+      <div id="grip" class="grip" title="Drag to move"></div>
       <div class="row top">
         <span id="status" class="status"></span>
         <a id="dash" class="link nodrag" href="#">dashboard</a>
       </div>
-      <div class="turn">
+      <div class="turn nodrag">
         <span id="role" class="role"></span>
-        <div id="text" class="text"></div>
+        <div id="text" class="text nodrag"></div>
       </div>
       <div class="row nav">
         <button id="prev" class="nodrag">‹</button>
@@ -107,8 +108,7 @@ function build(root: HTMLElement, actions: NotchActions): Refs {
     e.preventDefault();
     actions.openDashboard();
   });
-  refs.input.addEventListener("focus", () => (window as any).api.invoke("notch:setFocusable", true));
-  refs.input.addEventListener("blur", () => (window as any).api.invoke("notch:setFocusable", false));
+  // The window is focusable, so the input receives keyboard focus directly — no toggle needed.
   refs.input.addEventListener("keydown", (e) => {
     if (e.key === "Enter" && refs.input.value.trim()) {
       actions.sendText(refs.input.value.trim());

@@ -91,3 +91,48 @@ main {
 .turn.assistant .role {
   color: #4fd18b;
 }
+
+.tag {
+  margin-left: 8px;
+  font-size: 10px;
+  color: #7c828c;
+  text-transform: uppercase;
+}
+
+#turns h3 {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  color: #9aa1ab;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.capture {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+
+.thumb {
+  width: 160px;
+  border-radius: 6px;
+  border: 1px solid #2a2d33;
+  flex: 0 0 auto;
+  background: #101216;
+}
+
+.thumb.missing {
+  width: 160px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #7c828c;
+  font-size: 11px;
+}
+
+.cap-summary {
+  color: #c7ccd4;
+  line-height: 1.4;
+}

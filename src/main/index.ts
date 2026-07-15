@@ -14,6 +14,13 @@ import { registerShortcuts, unregisterShortcuts } from "./shortcuts";
 
 let notch: BrowserWindow | null = null;
 
+// Use one stable app name for BOTH the dev build and the packaged .app, so they share a
+// single userData folder (~/Library/Application Support/see-and-talk). Without this, the
+// packaged app (productName "See-and-Talk") writes to a different folder than dev
+// ("see-and-talk"), making the key + history look "lost" when switching builds.
+// Must run before app is ready (getPath("userData") is derived from the name).
+app.setName("see-and-talk");
+
 app.whenReady().then(() => {
   const db = openDatabase(join(app.getPath("userData"), "see-and-talk.db"));
   const history = new HistoryStore(db);
@@ -44,6 +51,7 @@ app.whenReady().then(() => {
 app.on("will-quit", () => {
   unregisterShortcuts();
 });
+
 
 app.on("window-all-closed", () => {
   /* keep running in tray on macOS */

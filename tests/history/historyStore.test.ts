@@ -106,4 +106,16 @@ describe("HistoryStore", () => {
     expect(store.listTurns(s2.id).map(t => t.text)).toEqual(["two"]);
     expect(store.listSessions()[0].id).toBe(s2.id); // most recent first
   });
+
+  it("lists captures for a session in order, isolated from other sessions", () => {
+    const s = store.startSession("m");
+    const a = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/1.webp", summary: "first" });
+    const b = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/2.webp", summary: "" });
+    const other = store.startSession("m");
+    store.addCapture({ sessionId: other.id, turnId: null, thumbPath: "/tmp/3.webp", summary: "other" });
+    const caps = store.listCaptures(s.id);
+    expect(caps.map((c) => c.id)).toEqual([a.id, b.id]);
+    expect(caps.map((c) => c.thumbPath)).toEqual(["/tmp/1.webp", "/tmp/2.webp"]);
+    expect(caps[1].summary).toBe("");
+  });
 });
