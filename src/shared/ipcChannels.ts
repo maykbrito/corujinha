@@ -17,6 +17,8 @@ export const IPC = {
   // capture
   CAPTURE_SCREEN: "capture:screen",
   CAPTURE_THUMB: "capture:thumb", // read a stored thumbnail file -> data URL (dashboard)
+  CAPTURE_OPEN: "capture:open", // open a stored screenshot in the default viewer
+  CAPTURE_REVEAL: "capture:reveal", // reveal a stored screenshot in Finder
   // notch window control
   NOTCH_SET_FOCUSABLE: "notch:setFocusable",
   // permissions

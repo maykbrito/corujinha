@@ -1,5 +1,5 @@
 // src/main/ipc.ts
-import { ipcMain, BrowserWindow, app } from "electron";
+import { ipcMain, BrowserWindow, app, shell } from "electron";
 import { join, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
 import { IPC, IPC_EVENT } from "@shared/ipcChannels";
@@ -51,14 +51,25 @@ export function registerIpc(deps: {
   // Read a stored capture thumbnail into a data URL for the dashboard. Restricted to the
   // app's captures directory so a renderer can't read arbitrary files.
   ipcMain.handle(IPC.CAPTURE_THUMB, (_e, thumbPath: string): string | null => {
+    const resolved = safeCapturePath(thumbPath);
+    if (!resolved) return null;
     try {
-      const dir = join(app.getPath("userData"), "captures");
-      const resolved = resolve(thumbPath);
-      if (!resolved.startsWith(dir) || !existsSync(resolved)) return null;
       return "data:image/webp;base64," + readFileSync(resolved).toString("base64");
     } catch {
       return null;
     }
+  });
+
+  // Open a stored screenshot in the default image viewer (Preview) — restricted to captures dir.
+  ipcMain.handle(IPC.CAPTURE_OPEN, (_e, thumbPath: string) => {
+    const resolved = safeCapturePath(thumbPath);
+    if (resolved) shell.openPath(resolved);
+  });
+
+  // Reveal a stored screenshot in Finder — restricted to captures dir.
+  ipcMain.handle(IPC.CAPTURE_REVEAL, (_e, thumbPath: string) => {
+    const resolved = safeCapturePath(thumbPath);
+    if (resolved) shell.showItemInFolder(resolved);
   });
 
   ipcMain.handle(IPC.NOTCH_SET_FOCUSABLE, (_e, on: boolean) => {
@@ -71,4 +82,16 @@ export function registerIpc(deps: {
   ipcMain.handle(IPC.PERM_STATUS, () => permissionStatus());
   ipcMain.handle(IPC.PERM_REQUEST, () => requestMicrophone());
   ipcMain.handle(IPC.PERM_OPEN_SCREEN_SETTINGS, () => openScreenRecordingSettings());
+}
+
+// Resolve a path only if it lives inside the app's captures directory and exists.
+// Guards the file-read/open/reveal handlers against arbitrary-path access from a renderer.
+function safeCapturePath(thumbPath: string): string | null {
+  try {
+    const dir = join(app.getPath("userData"), "captures");
+    const resolved = resolve(thumbPath);
+    return resolved.startsWith(dir) && existsSync(resolved) ? resolved : null;
+  } catch {
+    return null;
+  }
 }

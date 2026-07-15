@@ -120,6 +120,24 @@ main {
   border: 1px solid #2a2d33;
   flex: 0 0 auto;
   background: #101216;
+  cursor: zoom-in;
+}
+
+.cap-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cap-reveal {
+  color: #7db3ff;
+  font-size: 11px;
+  text-decoration: none;
+  width: fit-content;
+}
+
+.cap-reveal:hover {
+  text-decoration: underline;
 }
 
 .thumb.missing {

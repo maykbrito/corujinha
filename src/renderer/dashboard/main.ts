@@ -105,12 +105,21 @@ async function loadSession(sessionId: number) {
       const card = document.createElement("div");
       card.className = "capture";
       const summary = c.summary ? escapeHtml(c.summary) : "<i>(no summary recorded)</i>";
-      card.innerHTML = `<img class="thumb" alt="screenshot" /><div class="cap-summary">${summary}</div>`;
+      card.innerHTML =
+        `<img class="thumb" alt="screenshot" title="Click to open full image" />` +
+        `<div class="cap-body"><div class="cap-summary">${summary}</div>` +
+        `<a class="cap-reveal" href="#">Reveal in Finder</a></div>`;
       // Load the thumbnail lazily as a data URL (main restricts reads to the captures dir).
       api.invoke("capture:thumb", c.thumbPath).then((dataUrl: string | null) => {
         const img = card.querySelector("img")!;
         if (dataUrl) img.src = dataUrl;
         else img.replaceWith(Object.assign(document.createElement("div"), { className: "thumb missing", textContent: "image unavailable" }));
+      });
+      // Click the image -> open the full-size screenshot in the default viewer.
+      card.querySelector("img")?.addEventListener("click", () => api.invoke("capture:open", c.thumbPath));
+      card.querySelector(".cap-reveal")!.addEventListener("click", (e) => {
+        e.preventDefault();
+        api.invoke("capture:reveal", c.thumbPath);
       });
       capWrap.appendChild(card);
     }

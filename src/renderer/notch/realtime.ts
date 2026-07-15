@@ -79,8 +79,8 @@ export async function startConverse(hooks: ConverseHooks) {
     }
   }
 
-  // note_screen: the model records what it sees. Persistence flows through the tested
-  // mapServerEvent seam (below); this execute just acks so the model isn't left hanging.
+  // note_screen: the model records what it sees. Persist the summary directly here (the SDK
+  // delivers the parsed args to execute reliably), attaching it to the most recent capture.
   const noteScreen = tool({
     name: "note_screen",
     description:
@@ -93,7 +93,17 @@ export async function startConverse(hooks: ConverseHooks) {
       additionalProperties: false,
     } as any,
     strict: false,
-    execute: async () => "noted",
+    execute: async (input: any) => {
+      const summary = typeof input?.summary === "string" ? input.summary : "";
+      if (summary && lastCaptureId != null) {
+        try {
+          await api.invoke("history:setCaptureSummary", lastCaptureId, summary);
+        } catch {
+          /* best-effort */
+        }
+      }
+      return "noted";
+    },
   });
 
   // capture_screen: the model asks for a fresh look. We capture + inject the image and
@@ -117,9 +127,11 @@ export async function startConverse(hooks: ConverseHooks) {
     name: "See-and-Talk",
     voice: "marin",
     instructions:
-      "You are a Socratic study companion who can see the user's screen. Whenever you are given a " +
-      "new screenshot, call note_screen(summary) with a one-to-two sentence description of what it " +
-      "shows. Call capture_screen when you need a fresh look before answering. Keep replies concise.",
+      "You are a Socratic study companion who can see the user's screen. Every time you receive a " +
+      "new screenshot, FIRST call note_screen(summary) with a one-to-two sentence description of what " +
+      "is on screen (name key text, numbers, code, or UI you can read). Then answer. Read on-screen " +
+      "numbers and text carefully and quote them exactly. Call capture_screen when you need a fresh " +
+      "look before answering. Keep spoken replies concise.",
     tools: [noteScreen, captureScreen],
   });
 
