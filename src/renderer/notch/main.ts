@@ -123,12 +123,12 @@ const actions: NotchActions = {
   },
   pause() {
     if (!tryTransition("pause")) return;
-    converse?.pause();
+    try { converse?.pause(); } catch { /* session may be mid-reconnect */ }
     render();
   },
   resume() {
     if (!tryTransition("resume")) return;
-    converse?.resume();
+    try { converse?.resume(); } catch { /* session may be mid-reconnect */ }
     render();
   },
   async stop() {
@@ -149,7 +149,7 @@ const actions: NotchActions = {
   },
   mute(on) {
     muted = on;
-    converse?.mute(on);
+    try { converse?.mute(on); } catch { /* session may be mid-reconnect */ }
     render();
   },
   askNow() {
