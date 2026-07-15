@@ -22,11 +22,30 @@ let hasKey = false;
 // Bumped on every start/stop so a Stop pressed *during* connect can invalidate the
 // in-flight session and close it (otherwise it leaks a live mic after "stopped").
 let startGeneration = 0;
+// Sticky connect/token-mint error, shown even when idle; cleared on the next Start (Retry).
+let errorLabel = "";
+// Notice badge: persistent (screen not shared) or transient (capture failed) — auto-clears.
+let badge = "";
+let badgeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function render() {
-  const state: NotchState = { turns, index, status, statusLabel, muted, hasKey };
+  const state: NotchState = { turns, index, status, statusLabel, muted, hasKey, error: errorLabel, badge };
   renderNotch(root, state, actions);
 }
+
+// Show a badge for a few seconds, then revert to the persistent screen-share notice (if any).
+function flashBadge(msg: string) {
+  badge = msg;
+  render();
+  if (badgeTimer) clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => {
+    badge = screenNotice;
+    render();
+  }, 3000);
+}
+
+// Persistent notice while a session runs without screen-recording permission (voice-only).
+let screenNotice = "";
 
 async function refreshKey() {
   const s = await api.invoke("key:status");
@@ -56,7 +75,17 @@ const actions: NotchActions = {
     if (!hasKey) return; // onboarding gate — set a key in Settings first
     if (!tryTransition("start")) return;
     const gen = ++startGeneration;
+    errorLabel = ""; // clear any prior failure — this press is the retry
     statusLabel = "connecting…";
+    // Screen recording is optional: without it the conversation still works voice-only,
+    // but we surface a persistent badge so the user knows the AI can't see the screen.
+    try {
+      const perm = await api.invoke("perm:status");
+      screenNotice = perm?.screen === "granted" ? "" : "screen not shared — enable in Settings";
+    } catch {
+      screenNotice = "";
+    }
+    badge = screenNotice;
     render();
     try {
       const c = await startConverse({
@@ -64,6 +93,10 @@ const actions: NotchActions = {
         onUserText: (text) => pushTurn(makeTurn("user", text)),
         onStatus: (s) => {
           if (gen !== startGeneration) return; // ignore a superseded session
+          if (s === "capture-failed") {
+            flashBadge("screen capture failed — continuing voice-only");
+            return;
+          }
           statusLabel = s;
           render();
         },
@@ -77,9 +110,13 @@ const actions: NotchActions = {
       converse = c;
     } catch (e) {
       if (gen !== startGeneration) return; // a newer action owns the state
-      // Failed to connect (no key, mint failure, etc.) — fall back to idle.
+      // Failed to connect (token-mint failure, network, etc.) — fall back to idle and
+      // surface a sticky error. Start is enabled again in idle, so it doubles as Retry.
       status = "idle";
-      statusLabel = `error: ${String(e)}`;
+      statusLabel = "";
+      errorLabel = `couldn't connect: ${String(e)} — press Start to retry`;
+      badge = "";
+      screenNotice = "";
       converse = null;
       render();
     }
@@ -104,6 +141,10 @@ const actions: NotchActions = {
     muted = false;
     turns = [];
     index = 0;
+    errorLabel = "";
+    screenNotice = "";
+    badge = "";
+    if (badgeTimer) clearTimeout(badgeTimer);
     render();
   },
   mute(on) {

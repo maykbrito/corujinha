@@ -14,6 +14,8 @@ export interface NotchState {
   statusLabel: string; // free-form connection status ("connected", "reconnecting", ...)
   muted: boolean;
   hasKey: boolean; // false -> onboarding gate: Start disabled, "Set up in Settings" prompt
+  error: string; // sticky failure (e.g. token mint) shown even when idle; Start acts as Retry
+  badge: string; // transient/persistent notice ("screen not shared…", "capture failed…")
 }
 
 export interface NotchActions {
@@ -122,7 +124,13 @@ export function renderNotch(root: HTMLElement, state: NotchState, actions: Notch
   const refs = cache.get(root) ?? build(root, actions);
   const page = pageFor(state.turns, state.index);
 
-  refs.statusEl.textContent = state.status === "idle" ? "" : state.statusLabel;
+  // Status line collects: sticky error (always visible, offers Retry via Start), the live
+  // connection status (only while a session runs), and any transient/persistent badge.
+  const parts: string[] = [];
+  if (state.error) parts.push(state.error);
+  if (state.status !== "idle" && state.statusLabel) parts.push(state.statusLabel);
+  if (state.badge) parts.push(state.badge);
+  refs.statusEl.textContent = parts.join(" · ");
   refs.roleEl.textContent = page.item ? page.item.role : "";
   refs.textEl.textContent = page.item
     ? page.item.text
