@@ -6,7 +6,15 @@ import { randomUUID } from "crypto";
 
 export class ScreenCapturer {
   private pending = new Map<string, (r: { ok: boolean; dataUrl?: string; error?: string }) => void>();
-  constructor(private worker: BrowserWindow) {}
+  // The worker renderer registers its "capture:do" listener only after its module loads.
+  // Sending before then silently drops the first request, so gate every send on this promise.
+  private ready: Promise<void>;
+
+  constructor(private worker: BrowserWindow) {
+    this.ready = worker.webContents.isLoading()
+      ? new Promise<void>((res) => worker.webContents.once("did-finish-load", () => res()))
+      : Promise.resolve();
+  }
 
   // Called by the IPC handler for "capture:result".
   resolve(requestId: string, result: { ok: boolean; dataUrl?: string; error?: string }) {
@@ -27,7 +35,8 @@ export class ScreenCapturer {
         writeFileSync(thumbPath, Buffer.from(r.dataUrl.split(",")[1], "base64"));
         resolve({ dataUrl: r.dataUrl, thumbPath });
       });
-      this.worker.webContents.send("capture:do", id);
+      // Wait for the worker to have loaded so its "capture:do" listener exists.
+      this.ready.then(() => this.worker.webContents.send("capture:do", id));
     });
   }
 }
