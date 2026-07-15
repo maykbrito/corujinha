@@ -51,12 +51,11 @@ const cache = new WeakMap<HTMLElement, Refs>();
 function build(root: HTMLElement, actions: NotchActions): Refs {
   root.innerHTML = `
     <div id="panel">
-      <div id="grip" class="grip" title="Drag to move"></div>
       <div class="row top">
         <span id="status" class="status"></span>
         <a id="dash" class="link nodrag" href="#">dashboard</a>
       </div>
-      <div class="turn nodrag">
+      <div class="turn">
         <span id="role" class="role"></span>
         <div id="text" class="text nodrag"></div>
       </div>

@@ -22,7 +22,9 @@ export function createNotchWindow(): BrowserWindow {
     alwaysOnTop: true,
     webPreferences: { preload: join(__dirname, "../preload/index.js") },
   });
-  win.setAlwaysOnTop(true, "screen-saver");
+  // "floating" keeps the notch above normal windows but BELOW the macOS menu bar, so the
+  // tray/menu bar stays clickable. ("screen-saver" floats above the menu bar and blocks it.)
+  win.setAlwaysOnTop(true, "floating");
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   if (process.env["ELECTRON_RENDERER_URL"]) {
     win.loadURL(`${process.env["ELECTRON_RENDERER_URL"]}/notch/index.html`);
