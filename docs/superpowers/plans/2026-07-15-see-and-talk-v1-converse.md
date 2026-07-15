@@ -115,11 +115,12 @@ npm install @openai/agents-realtime
 - [ ] **Step 3: Write `vitest.config.ts`**
 
 ```ts
+import { resolve } from "path";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: { environment: "node", include: ["tests/**/*.test.ts"] },
-  resolve: { alias: { "@shared": "/src/shared" } },
+  resolve: { alias: { "@shared": resolve(__dirname, "src/shared") } },
 });
 ```
 
@@ -687,7 +688,7 @@ export class HistoryStore {
   }
 }
 
-// Turn arbitrary user text into a safe FTS5 phrase query: strip control chars, wrap as a
+// Turn arbitrary user text into a safe FTS5 phrase query: trim, then wrap as a
 // double-quoted phrase (escaping internal quotes), so operators like * - " never cause syntax errors.
 function toFtsMatch(raw: string): string | null {
   const trimmed = raw.trim();
@@ -1466,7 +1467,7 @@ export async function startConverse(hooks: ConverseHooks) {
       session.sendMessage("Please respond about what you currently see on my screen.");
     },
     mute(on: boolean) { session.mute(on); },
-    pause() { session.mute(true); },          // stop feeding mic; session stays warm
+    pause() { session.mute(true); },          // pause == mute the mic; kept distinct for the Pause control + state machine
     resume() { session.mute(false); },
     async stop() { await session.close(); await api.invoke("history:endSession", currentSessionId); },
     _session: session, _setLastCaptureNull: () => { lastCaptureId = null; },
