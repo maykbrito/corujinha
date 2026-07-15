@@ -46,6 +46,9 @@ export async function startConverse(hooks: ConverseHooks) {
   let lastCaptureId: number | null = null;
   // The user's mute intent, tracked so pause/resume — and reconnect — can't silently reopen a muted mic.
   let userMuted = false;
+  // Whether the user has paused (mic muted, session warm). Tracked so a reconnect
+  // while paused restores the muted mic instead of silently reopening it.
+  let paused = false;
   // Set by stop() so a deliberate close doesn't trigger the reconnect path.
   let stopped = false;
   // Guards against overlapping reconnect loops (a failed reconnect fires connection_change again).
@@ -228,7 +231,7 @@ export async function startConverse(hooks: ConverseHooks) {
         }
         session = fresh;
         established = true;
-        if (userMuted) session.mute(true); // re-apply the user's mute intent on the new mic
+        if (userMuted || paused) session.mute(true); // never reopen a mic the user muted/paused
         await seedRecentContext();
         reconnecting = false;
         hooks.onStatus("connected");
@@ -267,9 +270,11 @@ export async function startConverse(hooks: ConverseHooks) {
       session.mute(on);
     },
     pause() {
+      paused = true;
       session.mute(true);
     }, // pause == mute the mic; kept distinct for the Pause control + state machine
     resume() {
+      paused = false;
       // Restore the user's mute intent — never force the mic open on resume.
       session.mute(userMuted);
     },
