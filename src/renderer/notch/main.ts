@@ -126,7 +126,7 @@ const actions: NotchActions = {
     render();
   },
   openDashboard() {
-    // Wired in Chunk 7 (dashboard window).
+    api.invoke("window:openDashboard");
   },
 };
 

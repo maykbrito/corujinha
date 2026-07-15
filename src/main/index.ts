@@ -1,5 +1,5 @@
 // src/main/index.ts
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, ipcMain } from "electron";
 import { join } from "path";
 import { createNotchWindow } from "./windows/notchWindow";
 import { createCaptureWorker } from "./windows/captureWorker";
@@ -26,6 +26,9 @@ app.whenReady().then(() => {
     openDashboard: () => openDashboardWindow(),
     openSettings: () => openSettingsWindow(),
   });
+
+  // The notch's "dashboard" link opens the dashboard window.
+  ipcMain.handle("window:openDashboard", () => openDashboardWindow());
 
   registerShortcuts({
     sendToNotch: (channel) => notch?.webContents.send(channel),
