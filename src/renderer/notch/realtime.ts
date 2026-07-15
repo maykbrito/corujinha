@@ -50,6 +50,9 @@ export async function startConverse(hooks: ConverseHooks) {
   let stopped = false;
   // Guards against overlapping reconnect loops (a failed reconnect fires connection_change again).
   let reconnecting = false;
+  // Only reconnect a connection that was already live; a FAILED initial connect emits the same
+  // 'disconnected' event but must surface as a start error, not spawn a background reconnect loop.
+  let established = false;
 
   // Reassigned on every (re)connect; the tool `execute` closures and captureAndInject
   // reference this mutable binding, so they always target the live session.
@@ -208,7 +211,7 @@ export async function startConverse(hooks: ConverseHooks) {
   // Transparent reconnect under the SAME DB session row. Never mints a new sessions row and
   // never touches currentSessionId, so pre- and post-drop turns stay in one conversation.
   async function handleDisconnect(): Promise<void> {
-    if (stopped || reconnecting) return; // user Stop, or a reconnect already in flight
+    if (stopped || reconnecting || !established) return; // stop, reconnect in flight, or failed first connect
     reconnecting = true;
     hooks.onStatus("reconnecting");
 
@@ -224,6 +227,7 @@ export async function startConverse(hooks: ConverseHooks) {
           break;
         }
         session = fresh;
+        established = true;
         if (userMuted) session.mute(true); // re-apply the user's mute intent on the new mic
         await seedRecentContext();
         reconnecting = false;
@@ -240,6 +244,7 @@ export async function startConverse(hooks: ConverseHooks) {
 
   session = buildSession();
   await connectWithFreshToken(session);
+  established = true;
   hooks.onStatus("connected");
 
   return {
