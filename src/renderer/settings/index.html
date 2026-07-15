@@ -1,0 +1,46 @@
+<!-- src/renderer/settings/index.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Settings</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <h1>Settings</h1>
+
+    <section>
+      <h2>OpenAI API key</h2>
+      <p class="hint">Stored encrypted on this device (safeStorage). Used to mint short-lived Realtime tokens.</p>
+      <div class="row">
+        <input id="key" type="password" placeholder="sk-…" />
+        <button id="save-key">Save</button>
+      </div>
+      <p id="key-status" class="status"></p>
+    </section>
+
+    <section>
+      <h2>Permissions</h2>
+      <div class="perm">
+        <span>Microphone: <b id="mic-status">…</b></span>
+        <button id="req-mic">Request microphone</button>
+      </div>
+      <div class="perm">
+        <span>Screen Recording: <b id="screen-status">…</b></span>
+        <button id="open-screen">Open Screen Recording settings</button>
+      </div>
+    </section>
+
+    <section>
+      <h2>Shortcuts</h2>
+      <p class="hint">Editing is not available in v1.</p>
+      <ul class="shortcuts">
+        <li><kbd>⌘⇧A</kbd> Ask now</li>
+        <li><kbd>⌘⇧M</kbd> Toggle mute</li>
+        <li><kbd>⌘⇧H</kbd> Show / hide notch</li>
+      </ul>
+    </section>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

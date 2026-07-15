@@ -1,12 +1,12 @@
 // src/main/ipc.ts
 import { ipcMain, BrowserWindow } from "electron";
-import { IPC } from "@shared/ipcChannels";
+import { IPC, IPC_EVENT } from "@shared/ipcChannels";
 import type { HistoryStore } from "./history/historyStore";
 import type { ScreenCapturer } from "./screenCapturer";
 import type { Turn, Capture } from "@shared/types";
 import { makeElectronKeyStore } from "./keyStore";
 import { mintEphemeralToken } from "./tokenMinter";
-import { permissionStatus, requestMicrophone } from "./permissions";
+import { permissionStatus, requestMicrophone, openScreenRecordingSettings } from "./permissions";
 
 export function registerIpc(deps: {
   history: HistoryStore;
@@ -18,6 +18,8 @@ export function registerIpc(deps: {
   ipcMain.handle(IPC.KEY_GET_STATUS, () => keys.status());
   ipcMain.handle(IPC.KEY_SET, (_e, key: string) => {
     keys.set(key);
+    // Tell the notch its onboarding gate can lift (Start enables once a key exists).
+    deps.getNotch()?.webContents.send(IPC_EVENT.KEY_CHANGED);
     return keys.status();
   });
   ipcMain.handle(IPC.TOKEN_MINT, async () => {
@@ -52,4 +54,5 @@ export function registerIpc(deps: {
 
   ipcMain.handle(IPC.PERM_STATUS, () => permissionStatus());
   ipcMain.handle(IPC.PERM_REQUEST, () => requestMicrophone());
+  ipcMain.handle(IPC.PERM_OPEN_SCREEN_SETTINGS, () => openScreenRecordingSettings());
 }

@@ -1,0 +1,105 @@
+/* src/renderer/settings/styles.css */
+html,
+body {
+  margin: 0;
+  background: #16181c;
+  color: #e6e6e6;
+  font: 13px -apple-system, system-ui;
+}
+
+body {
+  padding: 16px 20px;
+}
+
+h1 {
+  font-size: 16px;
+  margin: 0 0 16px;
+}
+
+section {
+  border-top: 1px solid #2a2d33;
+  padding: 14px 0;
+}
+
+h2 {
+  font-size: 13px;
+  margin: 0 0 6px;
+}
+
+.hint {
+  color: #7c828c;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+input {
+  flex: 1;
+  background: #101216;
+  color: #e6e6e6;
+  border: 1px solid #2a2d33;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+button {
+  background: #2a2d33;
+  color: #e6e6e6;
+  border: 1px solid #3a3e46;
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+button:hover {
+  background: #343842;
+}
+
+.status {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+.status.ok {
+  color: #4fd18b;
+}
+
+.status.warn {
+  color: #e0a030;
+}
+
+.perm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.shortcuts {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.shortcuts li {
+  margin: 6px 0;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 42px;
+  text-align: center;
+  background: #101216;
+  border: 1px solid #3a3e46;
+  border-radius: 6px;
+  padding: 2px 6px;
+  margin-right: 8px;
+  font-family: ui-monospace, monospace;
+}

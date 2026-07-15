@@ -13,6 +13,7 @@ export interface NotchState {
   status: SessionStatus;
   statusLabel: string; // free-form connection status ("connected", "reconnecting", ...)
   muted: boolean;
+  hasKey: boolean; // false -> onboarding gate: Start disabled, "Set up in Settings" prompt
 }
 
 export interface NotchActions {
@@ -123,14 +124,19 @@ export function renderNotch(root: HTMLElement, state: NotchState, actions: Notch
 
   refs.statusEl.textContent = state.status === "idle" ? "" : state.statusLabel;
   refs.roleEl.textContent = page.item ? page.item.role : "";
-  refs.textEl.textContent = page.item ? page.item.text : "Press Start to begin.";
+  refs.textEl.textContent = page.item
+    ? page.item.text
+    : state.hasKey
+      ? "Press Start to begin."
+      : "Set up in Settings to begin.";
   refs.countEl.textContent = page.total ? `${page.index + 1} / ${page.total}` : "";
 
   refs.prev.disabled = !page.hasPrev;
   refs.next.disabled = !page.hasNext;
 
   const active = state.status === "active" || state.status === "paused";
-  refs.start.disabled = active;
+  // Start is gated by both an idle session and a configured key (onboarding).
+  refs.start.disabled = active || !state.hasKey;
   refs.stop.disabled = !active;
   refs.pauseResume.disabled = !active;
   refs.pauseResume.textContent = state.status === "paused" ? "Resume" : "Pause";

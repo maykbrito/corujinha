@@ -16,13 +16,22 @@ let muted = false;
 let turns: Turn[] = [];
 let index = 0;
 let converse: Converse | null = null;
+// Onboarding gate: Start stays disabled and shows a "Set up in Settings" prompt until a
+// key exists. Checked on load and refreshed when main broadcasts key:changed after key:set.
+let hasKey = false;
 // Bumped on every start/stop so a Stop pressed *during* connect can invalidate the
 // in-flight session and close it (otherwise it leaks a live mic after "stopped").
 let startGeneration = 0;
 
 function render() {
-  const state: NotchState = { turns, index, status, statusLabel, muted };
+  const state: NotchState = { turns, index, status, statusLabel, muted, hasKey };
   renderNotch(root, state, actions);
+}
+
+async function refreshKey() {
+  const s = await api.invoke("key:status");
+  hasKey = !!s?.hasKey;
+  render();
 }
 
 // Route a control press through the pure state machine; ignore invalid presses
@@ -44,6 +53,7 @@ function pushTurn(t: Turn) {
 
 const actions: NotchActions = {
   async start() {
+    if (!hasKey) return; // onboarding gate — set a key in Settings first
     if (!tryTransition("start")) return;
     const gen = ++startGeneration;
     statusLabel = "connecting…";
@@ -124,4 +134,11 @@ function makeTurn(role: Turn["role"], text: string): Turn {
   return { id: Date.now(), sessionId: converse?.getSessionId() ?? 0, role, source: "voice", text, createdAt: Date.now() };
 }
 
+// Global-shortcut relays from main (session lives here, so these run in the renderer).
+api.on("hotkey:askNow", () => actions.askNow());
+api.on("hotkey:toggleMute", () => actions.mute(!muted));
+// Lift the onboarding gate once a key is saved in Settings.
+api.on("key:changed", refreshKey);
+
+refreshKey();
 render();

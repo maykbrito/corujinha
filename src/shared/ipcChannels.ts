@@ -20,4 +20,12 @@ export const IPC = {
   // permissions
   PERM_STATUS: "perm:status",
   PERM_REQUEST: "perm:request",
+  PERM_OPEN_SCREEN_SETTINGS: "perm:openScreenSettings",
+} as const;
+
+// Main -> renderer broadcast events (not invoke handlers).
+export const IPC_EVENT = {
+  KEY_CHANGED: "key:changed", // notch re-checks key status to enable/disable Start
+  HOTKEY_ASK_NOW: "hotkey:askNow",
+  HOTKEY_TOGGLE_MUTE: "hotkey:toggleMute",
 } as const;
