@@ -6,36 +6,53 @@
 //   - RealtimeAgent / RealtimeSession(agent, { transport:'webrtc', model, config })
 //   - session.connect({ apiKey })            (ephemeral token.value)
 //   - session.on('transport_event', ...)     -> raw server events (the tested seam)
-//   - session.addImage(dataUrl, {triggerResponse})  (image injection; replaces the
-//                                            plan's hand-rolled conversation.item.create)
-//   - session.sendMessage(text) / session.mute(on) / session.close()
+//   - session.transport.on('connection_change', status) -> 'connecting'|'connected'|'disconnected'
+//     The WebRTC transport does NOT auto-reconnect: on peer-connection failed/closed (or
+//     'disconnected' past a grace period) it calls close(), which emits
+//     connection_change('disconnected'). User Stop emits the SAME event, so a `stopped`
+//     flag distinguishes a deliberate close from a real drop (openaiRealtimeWebRtc.mjs:344).
+//   - session.addImage(dataUrl, {triggerResponse})  (image injection)
+//   - session.sendMessage(text) / session.mute(on) / session.updateHistory(items) / session.close()
 //   - tools registered via the SDK `tool()` helper so the model both SEES them and
-//     receives a function_call_output (raw config.tools is overwritten by agent tools,
-//     per realtimeSession.js:278 — declaring them only on `config` never reaches the model).
+//     receives a function_call_output.
 //
 // The tested integration boundary is preserved: `mapServerEvent` drives all turn/summary
 // persistence over the `history:*` IPC. Every capture failure is caught so a turn degrades
-// to audio-only instead of throwing. `currentSessionId` is a mutable `let` for Chunk 8 reconnect.
+// to audio-only instead of throwing. `currentSessionId` is a mutable `let` and is NEVER
+// changed by reconnect — a dropped Realtime connection reconnects UNDER THE SAME DB session
+// row so the Dashboard shows one continuous conversation.
 import { RealtimeSession, RealtimeAgent, tool } from "@openai/agents-realtime";
 import { mapServerEvent } from "@shared/session/realtimeEvents";
 
 const api = (window as any).api;
 
+// Reconnect backoff: exponential from BASE, capped, with a hard attempt ceiling so a
+// permanently-dead network surfaces an error instead of spinning forever (storm guard).
+const RECONNECT_BASE_MS = 500;
+const RECONNECT_MAX_MS = 8000;
+const RECONNECT_MAX_ATTEMPTS = 6;
+const RECONNECT_SEED_TURNS = 10;
+
 export interface ConverseHooks {
   onAssistantText(text: string): void;
   onUserText(text: string): void;
-  onStatus(s: string): void; // "connected" | "reconnecting" | "capture-failed" | ...
+  onStatus(s: string): void; // "connected" | "reconnecting" | "capture-failed" | "reconnect-failed" | ...
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 export async function startConverse(hooks: ConverseHooks) {
-  const token = await api.invoke("token:mint");
   let currentSessionId: number = (await api.invoke("history:startSession", "gpt-realtime-2.1")).id;
   let lastCaptureId: number | null = null;
-  // The user's mute intent, tracked so pause/resume can't silently reopen a muted mic.
+  // The user's mute intent, tracked so pause/resume — and reconnect — can't silently reopen a muted mic.
   let userMuted = false;
+  // Set by stop() so a deliberate close doesn't trigger the reconnect path.
+  let stopped = false;
+  // Guards against overlapping reconnect loops (a failed reconnect fires connection_change again).
+  let reconnecting = false;
 
-  // Assigned below once the session exists; the tool `execute` closures reference it,
-  // but only run at conversation time, long after assignment.
+  // Reassigned on every (re)connect; the tool `execute` closures and captureAndInject
+  // reference this mutable binding, so they always target the live session.
   let session: RealtimeSession;
 
   // Capture the screen, persist a captures row immediately (empty summary = fallback),
@@ -100,21 +117,6 @@ export async function startConverse(hooks: ConverseHooks) {
     tools: [noteScreen, captureScreen],
   });
 
-  session = new RealtimeSession(agent, {
-    transport: "webrtc",
-    model: "gpt-realtime-2.1",
-    config: {
-      audio: {
-        input: { turnDetection: { type: "semantic_vad" } },
-        output: { voice: "marin" },
-      },
-    },
-  });
-
-  session.on("transport_event", (ev: any) => {
-    void handleServerEvent(ev);
-  });
-
   async function handleServerEvent(ev: any) {
     try {
       // Race mitigation: capture when the user STARTS speaking, so the image is already in
@@ -152,14 +154,99 @@ export async function startConverse(hooks: ConverseHooks) {
     }
   }
 
-  await session.connect({ apiKey: token.value });
+  // Build a fresh RealtimeSession wired with the same agent/config/handlers. Each new
+  // session gets its own transport, so its listeners are attached here; the previous
+  // session object is fully closed (see reconnect) so its listeners are not leaked.
+  function buildSession(): RealtimeSession {
+    const s = new RealtimeSession(agent, {
+      transport: "webrtc",
+      model: "gpt-realtime-2.1",
+      config: {
+        audio: {
+          input: { turnDetection: { type: "semantic_vad" } },
+          output: { voice: "marin" },
+        },
+      },
+    });
+    s.on("transport_event", (ev: any) => {
+      void handleServerEvent(ev);
+    });
+    // The disconnect seam: fires on both user close() and a real drop; `stopped` tells them apart.
+    s.transport.on("connection_change", (status: string) => {
+      if (status === "disconnected") void handleDisconnect();
+    });
+    return s;
+  }
+
+  async function connectWithFreshToken(s: RealtimeSession): Promise<void> {
+    const token = await api.invoke("token:mint");
+    await s.connect({ apiKey: token.value });
+  }
+
+  // Seed a reconnected session with recent context so the model keeps continuity. Best-effort:
+  // reads the last N turns of the SAME DB session and injects them as one system history item
+  // (updateHistory does not trigger a spoken response, unlike sendMessage).
+  async function seedRecentContext(): Promise<void> {
+    try {
+      const turns: Array<{ role: string; text: string }> = await api.invoke("history:listTurns", currentSessionId);
+      const recent = turns.slice(-RECONNECT_SEED_TURNS);
+      if (recent.length === 0) return;
+      const summary = recent.map((t) => `${t.role}: ${t.text}`).join("\n");
+      session.updateHistory([
+        {
+          itemId: `seed-${Date.now()}`,
+          type: "message",
+          role: "system",
+          content: [{ type: "input_text", text: `Earlier in this conversation (reconnected):\n${summary}` }],
+        },
+      ] as any);
+    } catch {
+      /* seeding is best-effort — a fresh reconnect without context is still usable */
+    }
+  }
+
+  // Transparent reconnect under the SAME DB session row. Never mints a new sessions row and
+  // never touches currentSessionId, so pre- and post-drop turns stay in one conversation.
+  async function handleDisconnect(): Promise<void> {
+    if (stopped || reconnecting) return; // user Stop, or a reconnect already in flight
+    reconnecting = true;
+    hooks.onStatus("reconnecting");
+
+    for (let attempt = 1; attempt <= RECONNECT_MAX_ATTEMPTS && !stopped; attempt++) {
+      await sleep(Math.min(RECONNECT_BASE_MS * 2 ** (attempt - 1), RECONNECT_MAX_MS));
+      if (stopped) break;
+      try {
+        const fresh = buildSession();
+        await connectWithFreshToken(fresh);
+        if (stopped) {
+          // Stop landed mid-reconnect — discard the session we just opened.
+          fresh.close();
+          break;
+        }
+        session = fresh;
+        if (userMuted) session.mute(true); // re-apply the user's mute intent on the new mic
+        await seedRecentContext();
+        reconnecting = false;
+        hooks.onStatus("connected");
+        return;
+      } catch {
+        /* connect failed — fall through to the next backoff attempt */
+      }
+    }
+
+    reconnecting = false;
+    if (!stopped) hooks.onStatus("reconnect-failed"); // gave up after the attempt ceiling
+  }
+
+  session = buildSession();
+  await connectWithFreshToken(session);
   hooks.onStatus("connected");
 
   return {
     getSessionId: () => currentSessionId,
     setSessionId: (id: number) => {
       currentSessionId = id;
-    }, // used by reconnect (Chunk 8)
+    }, // reserved for future modes; v1 reconnect leaves currentSessionId untouched
     async sendText(text: string) {
       await api.invoke("history:addTurn", { sessionId: currentSessionId, role: "user", source: "typed", text });
       hooks.onUserText(text); // surface the typed message in the notch, like voice turns
@@ -182,6 +269,7 @@ export async function startConverse(hooks: ConverseHooks) {
       session.mute(userMuted);
     },
     async stop() {
+      stopped = true; // must precede close() so the connection_change handler skips reconnect
       session.close();
       await api.invoke("history:endSession", currentSessionId);
     },
