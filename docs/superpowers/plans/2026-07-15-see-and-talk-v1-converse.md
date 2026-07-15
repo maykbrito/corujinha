@@ -188,14 +188,17 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 2: Rebuild better-sqlite3 for Electron**
+- [ ] **Step 2: Rebuild better-sqlite3 for Electron + add ABI-switch hooks**
 
-Add to `package.json` scripts and run once:
+`better-sqlite3` compiles to one ABI at a time. Vitest runs under **Node**; Electron runtime needs the **Electron** ABI. Add script hooks so each command self-heals the native binary:
 ```json
+"predev": "electron-builder install-app-deps",
+"prebuild": "electron-builder install-app-deps",
+"pretest": "npm rebuild better-sqlite3",
 "postinstall": "electron-builder install-app-deps"
 ```
 Run: `npm run postinstall`
-Expected: better-sqlite3 rebuilt against Electron's ABI, no errors.
+Expected: better-sqlite3 rebuilt against Electron's ABI, no errors. `npm test` will then rebuild it for Node automatically before running.
 
 - [ ] **Step 3: Commit**
 

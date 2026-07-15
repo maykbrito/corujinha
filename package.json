@@ -5,8 +5,11 @@
   "main": "out/main/index.js",
   "license": "MIT",
   "scripts": {
+    "predev": "electron-builder install-app-deps",
     "dev": "electron-vite dev",
+    "prebuild": "electron-builder install-app-deps",
     "build": "electron-vite build",
+    "pretest": "npm rebuild better-sqlite3",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
