@@ -86,6 +86,17 @@ plus function calling** in the same session.
 Both modes attach the latest screenshot (as `input_image` content) and can reference stored
 image summaries. Same connection, same model, two code paths that differ only in these knobs.
 
+**Switching modes mid-session is a track swap, not a reconnect.** The mode toggle replaces the
+input audio track on the live WebRTC connection (mic ↔ loopback) and flips the trigger config
+via `session.update` (semantic VAD on/off). The connection, and therefore session history,
+stays intact.
+
+**Image summaries are produced by a `note_screen` function tool.** Whenever the model is given
+a newly-captured screenshot, the system prompt instructs it to call `note_screen(summary)` with
+a one-to-two-sentence description of what the screen now shows. That summary is written to
+`captures.summary` (see §5). This keeps summary generation inside the single Realtime session —
+no second model or extra vision call — and the same summaries feed reconnect-seeding (§4.3).
+
 ### 4.2 Processes & windows
 
 **Main process (Node)**
@@ -95,8 +106,13 @@ image summaries. Same connection, same model, two code paths that differ only in
 - **ScreenCapturer** — whole-screen capture via `desktopCapturer` in a hidden offscreen worker
   window; downscale to ~1280px wide JPEG. Serves on-turn, on-demand, and change-detector needs.
 - **ChangeDetector** — cheap perceptual diff on downscaled frames; emits "screen changed" when a
-  threshold is exceeded, throttled (min interval). Drives proactive nudges. Toggleable.
-- **SystemAudio** — loopback capture via ScreenCaptureKit (no driver install) for Watch-along.
+  threshold is exceeded, throttled (min interval). Drives proactive nudges. Toggled on/off from
+  the Settings window ("Proactive comments").
+- **SystemAudio** — enables ScreenCaptureKit loopback capture (no driver install) for Watch-along.
+  Main registers `setDisplayMediaRequestHandler` with `audio: 'loopback'`; the **renderer**
+  actually acquires the loopback track via `getDisplayMedia` and adds it to the WebRTC peer
+  connection (mirroring how it acquires the mic track via `getUserMedia`). So both audio tracks
+  originate in the renderer; main's role is only to authorize loopback.
 - **HistoryStore** — `better-sqlite3` database; the IPC hub for reads/writes from all windows.
 - **PermissionsManager** — screen-recording + microphone permission prompts and status.
 
@@ -107,8 +123,8 @@ image summaries. Same connection, same model, two code paths that differ only in
   Top-center default; draggable + resizable (V & H). **Owns the WebRTC Realtime session** and all
   live conversation UI. (Window flags mirror Cody's proven `notchBubble.js`.)
 - **Dashboard** (`dashboard`) — normal window; browse + FTS5 search of history.
-- **Settings/Onboarding** (`settings`) — API key entry, watch-along interval, shortcut config,
-  permission status.
+- **Settings/Onboarding** (`settings`) — normal window; API key entry, watch-along interval,
+  "Proactive comments" (change-detector) toggle, shortcut config, permission status.
 - **Tray icon** — open dashboard/settings, toggle listen, quit. Avoids dock clutter.
 - **Capture worker** (`captureWorker`) — hidden offscreen window for `desktopCapturer`.
 
@@ -140,7 +156,8 @@ see the load balancer").
 - **turns** — `id`, `session_id`, `role` (user|assistant), `source` (voice|typed|system_audio),
   `text`, `created_at`. Ordered; drives notch pagination.
 - **captures** — `id`, `session_id`, `turn_id` (nullable), `thumb_path` (on disk),
-  `summary` (text of what was seen), `created_at`.
+  `summary` (text of what was seen, produced by the `note_screen` tool — see §4.1),
+  `created_at`.
 - **FTS5 virtual table** over `turns.text` + `captures.summary` for dashboard search.
 
 Thumbnails are written to `userData/captures/`; only the path + summary live in the DB.
