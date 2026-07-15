@@ -299,6 +299,7 @@ export function createNotchWindow(): BrowserWindow {
     focusable: false,
     skipTaskbar: true,
     alwaysOnTop: true,
+    type: "panel", // macOS: non-activating panel so listening never steals app focus
     webPreferences: { preload: join(__dirname, "../preload/index.js") },
   });
   win.setAlwaysOnTop(true, "screen-saver");
