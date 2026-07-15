@@ -71,4 +71,39 @@ describe("HistoryStore", () => {
     expect(store.search("   ")).toEqual([]);   // whitespace/empty -> no query, empty result
     expect(store.search("quoted").length).toBe(1);
   });
+
+  it("populates the correct hit fields for turn vs capture matches", () => {
+    const s = store.startSession("m");
+    const t = store.addTurn({ sessionId: s.id, role: "assistant", source: "voice", text: "quorum consensus" });
+    const c = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/d.webp", summary: "raft leader election" });
+
+    const turnHit = store.search("quorum")[0];
+    expect(turnHit.turnId).toBe(t.id);
+    expect(turnHit.captureId).toBeNull();
+    expect(turnHit.sessionId).toBe(s.id);
+    expect(turnHit.snippet).toContain("quorum");
+
+    const capHit = store.search("raft")[0];
+    expect(capHit.captureId).toBe(c.id);
+    expect(capHit.turnId).toBeNull();
+  });
+
+  it("keeps FTS in sync when a capture summary is replaced (no stale rows)", () => {
+    const s = store.startSession("m");
+    const c = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/e.webp", summary: "postgres schema" });
+    expect(store.search("postgres").length).toBe(1);
+    store.setCaptureSummary(c.id, "redis cluster");
+    expect(store.search("postgres").length).toBe(0); // old term gone
+    expect(store.search("redis").length).toBe(1);     // new term present
+  });
+
+  it("isolates turns and orders sessions across multiple sessions", () => {
+    const s1 = store.startSession("m");
+    const s2 = store.startSession("m");
+    store.addTurn({ sessionId: s1.id, role: "user", source: "typed", text: "one" });
+    store.addTurn({ sessionId: s2.id, role: "user", source: "typed", text: "two" });
+    expect(store.listTurns(s1.id).map(t => t.text)).toEqual(["one"]);
+    expect(store.listTurns(s2.id).map(t => t.text)).toEqual(["two"]);
+    expect(store.listSessions()[0].id).toBe(s2.id); // most recent first
+  });
 });
