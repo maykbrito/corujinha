@@ -1,0 +1,22 @@
+<!-- src/renderer/dashboard/index.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>History</h1>
+      <input id="search" type="search" placeholder="Search transcripts &amp; screen notes…" autofocus />
+    </header>
+    <main>
+      <section id="results" class="pane"></section>
+      <section id="turns" class="pane">
+        <p class="empty">Select a session to view its transcript.</p>
+      </section>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
