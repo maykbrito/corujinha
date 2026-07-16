@@ -66,7 +66,7 @@ Phase A is sequenced first so we have a functioning local app before touching UI
   - `package.json`: remove `@openai/agents-realtime`.
 - Add an **Ollama client** in the main process: `POST {baseURL}/v1/chat/completions` with a
   vision message (text + base64 image), OpenAI-compatible shape.
-- Rebuild the **notch** to copy Cody's `notch-bubble` behavior:
+- Rebuild the **notch** to copy Cody's `notch-bubble` behavior (**Phase B**):
   - Collapsed **pill** (300×34) top-center; **expanded panel** (436×212 default, resizable
     360–900 × 160–640); spring/ease morph animations; fade in/out.
   - **Drag** via header handle, **snap back** to the notch origin within 150px (pinned) else
@@ -144,8 +144,10 @@ User clicks Send
   "describe my screen" prompt if empty); show/hide notch; drop toggle-mute.
 
 **Windows**
-- **Notch panel** (`notch`) — rebuilt to Cody's `notch-bubble` model (§4.3). Owns the text field,
-  Send, response rendering, pagination, drag/resize/opacity, and the `ollama:chat` calls via IPC.
+- **Notch panel** (`notch`) — **Phase A** wires the *existing* notch's text field + Send to the
+  Ollama pipeline; **Phase B** replaces the chrome with Cody's `notch-bubble` model (§4.3). In its
+  final form it owns the text field, Send, response rendering, pagination, drag/resize/opacity, and
+  the `ollama:chat` calls via IPC.
 - **Dashboard** (`dashboard`) — **unchanged**.
 - **Settings** (`settings`) — Ollama URL + model + screen-recording permission.
 - **Capture worker** (`captureWorker`) — **unchanged**.
