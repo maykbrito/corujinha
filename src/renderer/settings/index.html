@@ -10,21 +10,22 @@
     <h1>Settings</h1>
 
     <section>
-      <h2>OpenAI API key</h2>
-      <p class="hint">Stored encrypted on this device (safeStorage). Used to mint short-lived Realtime tokens.</p>
+      <h2>Ollama</h2>
+      <p class="hint">Local model server. Defaults to http://localhost:11434 running gemma4:26b.</p>
       <div class="row">
-        <input id="key" type="password" placeholder="sk-…" />
-        <button id="save-key">Save</button>
+        <label>Base URL</label>
+        <input id="ollama-url" type="text" placeholder="http://localhost:11434" />
       </div>
-      <p id="key-status" class="status"></p>
+      <div class="row">
+        <label>Model</label>
+        <input id="ollama-model" type="text" placeholder="gemma4:26b" />
+      </div>
+      <button id="save-config">Save</button>
+      <p id="config-status" class="status"></p>
     </section>
 
     <section>
       <h2>Permissions</h2>
-      <div class="perm">
-        <span>Microphone: <b id="mic-status">…</b></span>
-        <button id="req-mic">Request microphone</button>
-      </div>
       <div class="perm">
         <span>Screen Recording: <b id="screen-status">…</b></span>
         <button id="open-screen">Open Screen Recording settings</button>
@@ -36,7 +37,6 @@
       <p class="hint">Editing is not available in v1.</p>
       <ul class="shortcuts">
         <li><kbd>⌘⇧A</kbd> Ask now</li>
-        <li><kbd>⌘⇧M</kbd> Toggle mute</li>
         <li><kbd>⌘⇧H</kbd> Show / hide notch</li>
       </ul>
     </section>
