@@ -6,6 +6,14 @@
 
 **Architecture:** The main process owns the frameless/transparent panel window and a small IPC surface for move/resize/position/pinned/click-through. The renderer owns a morph state machine (collapsed↔expanded), drag-with-snap, edge resize, an opacity slider that tints the surface via a CSS variable, hover-reveal of controls, and click-through toggling when the pointer leaves the shape. Pure geometry (size/opacity clamps, snap distance, notch bounds) is extracted into a tested module. The Phase A turn pipeline (`startConverse`/`ask`) is reused unchanged.
 
+### Window/morph model (pin this — resolves the click-through dead-zone)
+
+Matches Cody's macOS path exactly:
+
+- The OS window is sized to the **expanded panel** (`DEFAULT_W × DEFAULT_H`), NOT `MAX_H`. Expand/collapse is a **CSS morph of the `.notch-shape` inside the window** — the OS window is NOT resized on collapse. Resize (edge handles) DOES resize the OS window to the new panel size via `notch:resize`.
+- **Click-through is the default** (`setIgnoreMouseEvents(true,{forward:true})` at creation). The renderer DISABLES it on `mouseenter`/pointer-inside `.notch-shape` and RE-ENABLES it on `mouseleave` (when not dragging/resizing) — port Cody notch-bubble.html:2800-2811. So the transparent region around the collapsed pill (and around the panel) always forwards clicks to whatever is beneath.
+- **Dead-zone guard:** a fast pointer exit can skip `mouseleave`, leaving click-through disabled over the transparent remainder. If the smoke test (Task 8 step below) reveals this, add Cody's main-process cursor poll as a fallback (`syncNotchMouseEventsWithCursor`, notchBubble.js:141-155) that re-asserts click-through when the cursor sits outside the visible shape rect. Start WITHOUT the poll (YAGNI); add only if the dead-zone appears.
+
 **Tech Stack:** Electron, TypeScript, Vitest. No new dependencies.
 
 **Spec:** `docs/superpowers/specs/2026-07-16-see-and-talk-local-ollama-design.md` (§4.3)
@@ -89,6 +97,12 @@ describe("notchGeometry", () => {
     const b = notchBounds({ x: 0, y: 0, width: 1440, height: 900 }, 300);
     expect(b).toEqual({ x: Math.round(720 - 150), y: 0, width: 300, height: NOTCH.COLLAPSED_H });
   });
+  it("recenters a pinned panel on resize (x tracks the new width)", () => {
+    // The controller centers a pinned window: x = area.x + (area.width - width)/2
+    const area = { x: 0, y: 0, width: 1440, height: 900 };
+    const b = notchBounds(area, 600);
+    expect(b.x).toBe(Math.round((1440 - 600) / 2)); // 420
+  });
 });
 ```
 
@@ -147,7 +161,7 @@ export function notchBounds(area: Rect, width: number): Rect {
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `/usr/local/bin/node ./node_modules/vitest/vitest.mjs run tests/shared/notchGeometry.test.ts`
-Expected: PASS (4 tests).
+Expected: PASS (5 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -162,6 +176,8 @@ git commit -m "feat: pure notch geometry (size/opacity clamps, snap, bounds)"
 - Modify: `src/shared/ipcChannels.ts`
 
 - [ ] **Step 1: Add channels** to `IPC` (after `NOTCH_SET_FOCUSABLE`):
+
+> `NOTCH_SET_FOCUSABLE` stays defined but is **unused** (the window is `focusable:true` for the text field, consistent with Phase A). Leave it as a no-op channel or wire a future focus toggle; do not remove it in Phase B.
 
 ```ts
   // notch window control (Cody-style morph/drag/resize)
@@ -212,7 +228,7 @@ export function createNotchWindow(): BrowserWindow {
     x: b.x,
     y: b.y,
     width: NOTCH.DEFAULT_W,
-    height: NOTCH.MAX_H, // give the shape vertical room; the visible pill/panel is CSS-sized
+    height: NOTCH.DEFAULT_H, // window == expanded-panel size; the pill is CSS-morphed inside it (see Window/morph model)
     frame: false,
     transparent: true,
     hasShadow: false,
@@ -241,7 +257,7 @@ export function createNotchWindow(): BrowserWindow {
 }
 ```
 
-Note the change from `"floating"` to `"screen-saver"` matches Cody (floats above the menu bar). The tray still works because it's a separate status item.
+Note the change from `"floating"` to `"screen-saver"` matches Cody (floats above the menu bar). This works because the window is **click-through by default** over the menu-bar region: the centered ~436px window overlaps only the physical-notch center of the menu bar (no items there), while tray icons sit top-right outside it — so the menu bar and tray stay clickable. Verify in the Task 8 smoke.
 
 - [ ] **Step 2: Create `notchWindowController.ts`**
 
@@ -300,7 +316,7 @@ export function registerNotchWindowControl(getNotch: () => BrowserWindow | null)
 }
 ```
 
-- [ ] **Step 3: Wire in `main/index.ts`** — import and call `registerNotchWindowControl(() => notch)` after `notch = createNotchWindow();`, and end the active session on quit. Add:
+- [ ] **Step 3: Wire in `main/index.ts`** — import and call `registerNotchWindowControl(() => notch)` after `notch = createNotchWindow();`, and end any active DB session **directly in main** on quit (synchronous `better-sqlite3`, no renderer round-trip — the app can exit before an async IPC hop completes). Add:
 
 ```ts
 import { registerNotchWindowControl } from "./windows/notchWindowController";
@@ -309,13 +325,24 @@ After `registerIpc({ ... })`:
 ```ts
   registerNotchWindowControl(() => notch);
 ```
-In `app.on("will-quit", ...)` (leave existing `unregisterShortcuts()`):
+Replace the `will-quit` handler (keep `unregisterShortcuts()`):
 ```ts
 app.on("will-quit", () => {
   unregisterShortcuts();
-  notch?.webContents.send("notch:endSession"); // let the renderer close its active DB session
+  history.endActiveSessions(); // close any active session synchronously before exit
 });
 ```
+(`history` is already in scope in `whenReady`; if the handler is registered outside that scope, hoist a module-level `let history` set in `whenReady`.)
+
+- [ ] **Step 3b: Add `HistoryStore.endActiveSessions()`** in `src/main/history/historyStore.ts` (next to `endSession`):
+
+```ts
+  endActiveSessions(): void {
+    this.db.prepare("UPDATE sessions SET status='ended', ended_at=? WHERE status='active'").run(Date.now());
+  }
+```
+
+This makes "sessions end on quit" reliable and removes the need for any `notch:endSession` renderer message.
 
 - [ ] **Step 4: Typecheck**
 
@@ -325,8 +352,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/main/windows/notchWindow.ts src/main/windows/notchWindowController.ts src/main/index.ts
-git commit -m "feat: Cody-style notch window + drag/resize/position IPC controller"
+git add src/main/windows/notchWindow.ts src/main/windows/notchWindowController.ts src/main/index.ts src/main/history/historyStore.ts
+git commit -m "feat: Cody-style notch window + drag/resize/position IPC controller + end-active-sessions on quit"
 ```
 
 ---
@@ -543,10 +570,39 @@ git commit -m "feat: notch morph-shape HTML/CSS (pill<->panel, hover-reveal, opa
 Builds the full `.notch-shape` DOM once (header with gear+collapse, inner with content-area + settings sub-panel, resize handles), caches refs, and on render updates: status, current turn (role + `renderMarkdown(text)`), pagination counter/buttons, and the opacity slider value. Exposes the DOM refs the controller (main.ts) needs for the state machine + drag/resize.
 
 Key requirements:
-- `NotchState` gains `opacity: number`. `NotchActions` keeps `send/askNow/prev/next/openDashboard` and adds `setOpacity(v: number)`, `toggleCollapsed()`.
+- `NotchState` gains `opacity: number`. `NotchActions` keeps `send/askNow/prev/next/openDashboard` and adds `setOpacity(v: number)` and `toggleCollapsed()`. **Pin this exact contract** (Task 6 and Task 7 must agree):
+
+```ts
+// src/renderer/notch/ui.ts — exported interfaces (locked contract)
+import type { Turn } from "@shared/types";
+export interface NotchState {
+  turns: Turn[];
+  index: number;
+  statusLabel: string;
+  opacity: number;       // 0.45..1, drives --notch-background-opacity
+}
+export interface NotchActions {
+  send(text: string): Promise<boolean>; // clears input only on true (spec §7)
+  askNow(): void;
+  prev(): void;
+  next(): void;
+  openDashboard(): void;
+  setOpacity(v: number): void;           // persists + applies surface tint
+  toggleCollapsed(): void;               // pill <-> panel (collapse button / pill click)
+}
+// buildNotch returns the DOM refs main.ts attaches drag/resize/morph listeners to:
+export interface NotchRefs {
+  shape: HTMLElement; header: HTMLElement; collapseBtn: HTMLElement; gearBtn: HTMLElement;
+  resizeRight: HTMLElement; resizeBottom: HTMLElement; input: HTMLInputElement;
+  opacitySlider: HTMLInputElement;
+}
+export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs;
+export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void;
+```
+
 - The assistant/user turn text is rendered via `renderMarkdown` (import from `@shared/notchMarkdown`) into `.notch-content` (innerHTML), NOT textContent.
-- The input + Send live in the header-adjacent footer of the inner panel; Enter submits (preserve Phase A behavior: clear only on success).
-- Export the built refs (shape element, header, collapse btn, gear btn, resize handles, input) via a returned handle so main.ts can attach drag/resize/morph listeners. Prefer a single `buildNotch(root, actions): NotchRefs` returning all elements.
+- The input + Send live in the footer of the inner panel; Enter submits (preserve Phase A behavior: clear only on success).
+- Keep functions small; `buildNotch` builds the full `.notch-shape` structure once and returns `NotchRefs`.
 
 Because this file coordinates DOM structure that main.ts drives, implement it together with Task 7 and typecheck/smoke as a pair. Full code is left to the implementer following the structure of the current `ui.ts` (build-once + render) plus the Cody shape; keep functions small.
 
@@ -572,7 +628,7 @@ Port the interaction logic from `docs/superpowers/reference/cody/notch-bubble.ht
 - **Opacity** slider → `setOpacity` persists to localStorage, sets `--notch-background-opacity`.
 - **Click-through**: on pointer enter/inside → `notch:setIgnoreMouse(false)`; on leave (not dragging/resizing) → `notch:setIgnoreMouse(true,{forward:true})` (port :2778-2811).
 - **Turn wiring**: reuse Phase A controller logic (lazy `ensureConverse`, `pushTurn`, `send` returns success, `askNow`, `prev`/`next`, hotkey relay).
-- **End session**: listen for `notch:endSession` (sent on quit) → `converse?.stop()`.
+- **End session**: no renderer involvement — main ends active sessions synchronously on quit (Task 3b). `converse.stop()` is no longer called from the renderer; it may be removed from the returned handle or left unused (note which).
 
 - [ ] **Step 1** Implement `main.ts` per above.
 - [ ] **Step 2** Typecheck + build: `npm run typecheck && npm run build` — expect PASS.
@@ -585,7 +641,7 @@ git commit -m "feat: notch morph/drag/resize/opacity/click-through wired to turn
 
 ### Task 8: Full verification + manual smoke
 
-- [ ] **Step 1** Full test suite: `npm test` — expect all green (Phase A 20 + notchGeometry 4 + notchMarkdown 5 = 29).
+- [ ] **Step 1** Full test suite: `npm test` — expect all green (Phase A 20 + notchGeometry 5 + notchMarkdown 5 = 30).
 - [ ] **Step 2** Typecheck + build: `npm run typecheck && npm run build` — expect PASS.
 - [ ] **Step 3** Manual smoke (`npm run dev`, Ollama + Handy running):
   1. App opens as a **pill** at top-center; the rest of the screen is click-through.
@@ -596,7 +652,8 @@ git commit -m "feat: notch morph/drag/resize/opacity/click-through wired to turn
   6. Gear → settings sub-panel; **opacity** slider tints the surface 0.45–1.0; persists across restart.
   7. Collapse button → morphs back to the pill; click pill re-expands.
   8. Controls are hidden until you **hover** the shape.
-  9. Quit the app → the active DB session is ended (Dashboard shows it as `ended`).
+  9. **Click-through:** with the pill collapsed, click a desktop icon / window directly below and around the pill — the click passes through (the notch does not eat it). Repeat right after hovering the pill then moving away fast (dead-zone check). Also confirm the **menu bar and tray icons** stay clickable with the notch at `screen-saver` level.
+  10. Quit the app → the active DB session is ended (Dashboard shows it as `ended`).
 - [ ] **Step 4** Commit any smoke fixes, then final review.
 
 ```bash
