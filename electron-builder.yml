@@ -18,7 +18,10 @@ extraResources:
       - "**/*"
 
 # Rebuild native modules (better-sqlite3) against the packaged Electron.
+# buildDependenciesFromSource forces compiling for Electron's ABI (148 for Electron 43)
+# instead of grabbing a prebuilt Node-ABI (127) binary, which would crash on launch.
 npmRebuild: true
+buildDependenciesFromSource: true
 asarUnpack:
   - "**/*.node"
 
