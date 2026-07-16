@@ -31,7 +31,7 @@ export class ScreenCapturer {
         if (!r.ok || !r.dataUrl) return reject(new Error(r.error ?? "capture failed"));
         const dir = join(app.getPath("userData"), "captures");
         mkdirSync(dir, { recursive: true });
-        const thumbPath = join(dir, `${id}.webp`);
+        const thumbPath = join(dir, `${id}.jpg`);
         writeFileSync(thumbPath, Buffer.from(r.dataUrl.split(",")[1], "base64"));
         resolve({ dataUrl: r.dataUrl, thumbPath });
       });

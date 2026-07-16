@@ -2,7 +2,10 @@
 const api = (window as any).api;
 
 // maxWidth 1920 + quality 0.92: crisp enough for the model to read on-screen numbers/code.
-// (OpenAI vision resizes to fit ~2048 on the long side, so >1920 buys little but costs more.)
+// JPEG (not WebP): Ollama/llama.cpp decodes images via stb_image, which supports JPEG/PNG but
+// NOT WebP — a WebP payload fails with "Failed to load image or audio file". JPEG @0.92 keeps
+// text readable and is far smaller than PNG.
+// ponytail: JPEG 0.92; if small colored text ever reads poorly, switch to "image/png" (lossless, larger).
 async function captureOnce(maxWidth = 1920, quality = 0.92): Promise<string> {
   // Ask for the display's native resolution (up to 4K) — the default is capped low, which
   // is why small text was unreadable.
@@ -26,7 +29,7 @@ async function captureOnce(maxWidth = 1920, quality = 0.92): Promise<string> {
     const ctx = canvas.getContext("2d")!;
     ctx.imageSmoothingQuality = "high";
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/webp", quality);
+    return canvas.toDataURL("image/jpeg", quality);
   } finally {
     // Always release the live screen-capture stream, even if drawing/encoding throws.
     stream.getTracks().forEach((t) => t.stop());

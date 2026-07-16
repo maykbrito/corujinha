@@ -42,7 +42,9 @@ export function registerIpc(deps: {
     const resolved = safeCapturePath(thumbPath);
     if (!resolved) return null;
     try {
-      return "data:image/webp;base64," + readFileSync(resolved).toString("base64");
+      // Derive the mime from the extension so both new .jpg and any legacy .webp render.
+      const mime = resolved.endsWith(".webp") ? "image/webp" : "image/jpeg";
+      return `data:${mime};base64,` + readFileSync(resolved).toString("base64");
     } catch {
       return null;
     }
