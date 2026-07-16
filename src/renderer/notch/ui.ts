@@ -12,7 +12,7 @@ export interface NotchState {
   statusLabel: string; // "thinking…" | "" | "error: …" | "screen capture failed — text only"
 }
 export interface NotchActions {
-  send(text: string): void;
+  send(text: string): Promise<boolean>; // resolves true if the turn succeeded (clears the field)
   askNow(): void;
   prev(): void;
   next(): void;
@@ -51,11 +51,14 @@ function build(root: HTMLElement, actions: NotchActions): Refs {
     prev: $<HTMLButtonElement>("prev"), next: $<HTMLButtonElement>("next"),
     send: $<HTMLButtonElement>("send"), input: $<HTMLInputElement>("msg"),
   };
-  const submit = () => {
+  const submit = async () => {
     const v = refs.input.value.trim();
     if (!v) return;
-    actions.send(v);
-    refs.input.value = "";
+    refs.send.disabled = true;
+    const ok = await actions.send(v);
+    refs.send.disabled = false;
+    if (ok) refs.input.value = ""; // keep the text on failure so the user can retry (spec §7)
+    else refs.input.focus();
   };
   refs.prev.addEventListener("click", actions.prev);
   refs.next.addEventListener("click", actions.next);

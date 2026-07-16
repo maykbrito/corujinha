@@ -14,13 +14,14 @@ let turns: Turn[] = [];
 let index = 0;
 let statusLabel = "";
 let converse: Converse | null = null;
+let turnSeq = 0; // monotonic local id for rendered turns (not the DB rowid)
 
 function render() {
   const state: NotchState = { turns, index, statusLabel };
   renderNotch(root, state, actions);
 }
 function pushTurn(role: Turn["role"], text: string) {
-  turns = [...turns, { id: Date.now() + Math.random(), sessionId: converse?.getSessionId() ?? 0, role, source: "typed", text, createdAt: Date.now() }];
+  turns = [...turns, { id: ++turnSeq, sessionId: converse?.getSessionId() ?? 0, role, source: "typed", text, createdAt: Date.now() }];
   index = turns.length - 1;
   render();
 }
@@ -35,7 +36,10 @@ async function ensureConverse(): Promise<Converse> {
 }
 
 const actions: NotchActions = {
-  async send(text) { (await ensureConverse()).ask(text).catch(() => {}); },
+  async send(text) {
+    try { return await (await ensureConverse()).ask(text); }
+    catch { return false; }
+  },
   async askNow() { (await ensureConverse()).askNow().catch(() => {}); },
   prev() { index = Math.max(0, index - 1); render(); },
   next() { index = Math.min(turns.length - 1, index + 1); render(); },

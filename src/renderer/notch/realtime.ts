@@ -16,9 +16,9 @@ export async function startConverse(hooks: ConverseHooks) {
   const sessionId: number = (await api.invoke("history:startSession", cfg.model)).id;
   const context: Array<{ role: "user" | "assistant"; text: string }> = [];
 
-  async function ask(text: string): Promise<void> {
+  async function ask(text: string): Promise<boolean> {
     const q = text.trim();
-    if (!q) return;
+    if (!q) return false;
     hooks.onUserText(q);
     await api.invoke("history:addTurn", { sessionId, role: "user", source: "typed", text: q });
 
@@ -48,8 +48,10 @@ export async function startConverse(hooks: ConverseHooks) {
       context.push({ role: "assistant", text: reply });
       hooks.onAssistantText(reply);
       hooks.onStatus("");
+      return true;
     } catch (e) {
       hooks.onStatus(`error: ${String(e)}`);
+      return false;
     }
   }
 
