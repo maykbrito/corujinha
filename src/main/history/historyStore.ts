@@ -43,19 +43,6 @@ export class HistoryStore {
     return { ...c, summary: c.summary ?? "", id, createdAt: now };
   }
 
-  // Attach/replace a capture's summary (produced by the note_screen tool, possibly after the row exists).
-  setCaptureSummary(captureId: number, summary: string): void {
-    const row = this.db.prepare("SELECT session_id as sessionId, created_at as createdAt FROM captures WHERE id=?").get(captureId) as { sessionId: number; createdAt: number } | undefined;
-    if (!row) return;
-    this.db.prepare("UPDATE captures SET summary=? WHERE id=?").run(summary, captureId);
-    this.db.prepare("DELETE FROM search_fts WHERE kind='capture' AND ref_id=?").run(captureId);
-    if (summary) {
-      this.db.prepare(
-        "INSERT INTO search_fts (body, kind, ref_id, session_id, created_at) VALUES (?, 'capture', ?, ?, ?)"
-      ).run(summary, captureId, row.sessionId, row.createdAt);
-    }
-  }
-
   listSessions(): Session[] {
     return this.db.prepare("SELECT id, mode, model, started_at as startedAt, ended_at as endedAt, status FROM sessions ORDER BY id DESC").all() as Session[];
   }

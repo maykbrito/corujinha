@@ -54,14 +54,6 @@ describe("HistoryStore", () => {
     expect(store.search("nonexistentword").length).toBe(0);
   });
 
-  it("stores a capture then attaches a summary later (note_screen fallback path)", () => {
-    const s = store.startSession("m");
-    const c = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/c.webp", summary: "" });
-    expect(store.search("kubernetes").length).toBe(0);
-    store.setCaptureSummary(c.id, "a kubernetes cluster diagram");
-    expect(store.search("kubernetes").length).toBe(1);
-  });
-
   it("sanitizes FTS input so special characters and empty queries never throw", () => {
     const s = store.startSession("m");
     store.addTurn({ sessionId: s.id, role: "user", source: "typed", text: `use a "quoted" term and a-hyphen` });
@@ -86,15 +78,6 @@ describe("HistoryStore", () => {
     const capHit = store.search("raft")[0];
     expect(capHit.captureId).toBe(c.id);
     expect(capHit.turnId).toBeNull();
-  });
-
-  it("keeps FTS in sync when a capture summary is replaced (no stale rows)", () => {
-    const s = store.startSession("m");
-    const c = store.addCapture({ sessionId: s.id, turnId: null, thumbPath: "/tmp/e.webp", summary: "postgres schema" });
-    expect(store.search("postgres").length).toBe(1);
-    store.setCaptureSummary(c.id, "redis cluster");
-    expect(store.search("postgres").length).toBe(0); // old term gone
-    expect(store.search("redis").length).toBe(1);     // new term present
   });
 
   it("isolates turns and orders sessions across multiple sessions", () => {
