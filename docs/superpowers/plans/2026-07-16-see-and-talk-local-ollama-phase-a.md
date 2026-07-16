@@ -203,6 +203,8 @@ Expected: FAIL (module not found).
 
 ```ts
 // src/main/ollama/ollamaClient.ts
+// OllamaConfig is intentionally a local 2-field shape (not imported from @shared/types)
+// so this task is self-contained — ConfigData is added later in Task 3.
 export interface OllamaConfig { ollamaUrl: string; model: string; }
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -434,6 +436,8 @@ git commit -m "chore: remove OpenAI/keyStore/mic/sessionState/realtimeEvents dea
 
 Keeps the exported name `startConverse` / type `Converse` so `main.ts` changes stay small. No WebRTC, no session state — one method `ask(text)` that persists the user turn + capture (summary = the question text, inline), calls `ollama:chat`, persists + returns the assistant turn.
 
+> **Note on spec §8 "capture→summary" test:** that behavior (`addCapture({ summary: q })`) lives inside `ask()`, which depends on the `window.api` global — not unit-test-friendly without a renderer harness, and the notch is rewritten in Phase B. In Phase A it is verified by **manual smoke step 7** (Dashboard FTS search finds the question text on the capture). Deferring the unit test here, not skipping the verification.
+
 - [ ] **Step 1: Replace the file**
 
 ```ts
@@ -451,7 +455,8 @@ export interface ConverseHooks {
 }
 
 export async function startConverse(hooks: ConverseHooks) {
-  const sessionId: number = (await api.invoke("history:startSession", "gemma4:26b")).id;
+  const cfg = await api.invoke("config:get"); // { ollamaUrl, model }
+  const sessionId: number = (await api.invoke("history:startSession", cfg.model)).id;
   const context: Array<{ role: "user" | "assistant"; text: string }> = [];
 
   async function ask(text: string): Promise<void> {
@@ -659,7 +664,7 @@ render();
 - [ ] **Step 2: Typecheck**
 
 Run: `npx tsc --noEmit`
-Expected: PASS (no remaining references to removed symbols).
+Expected: errors ONLY in `src/renderer/settings/main.ts` (still references the removed `KeyStatus` / `p.microphone` — fixed in Task 9). No errors elsewhere. Proceed.
 
 - [ ] **Step 3: Commit**
 
