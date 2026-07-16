@@ -27,7 +27,6 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "@openai/agents-realtime": "^0.13.4",
     "better-sqlite3": "^12.11.1"
   }
 }
