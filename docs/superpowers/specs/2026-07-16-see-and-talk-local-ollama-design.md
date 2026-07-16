@@ -29,12 +29,41 @@ draggable, resizable, opacity-adjustable panel.
 **The current OpenAI implementation is preserved on the branch `feature/openai-realtime`** so we
 can return to it if desired.
 
+### Two phases (two implementation plans)
+
+The work splits into two nearly-decoupled subsystems, each its own plan:
+
+- **Phase A — Local brain.** Replace OpenAI with the Ollama turn pipeline: OllamaClient,
+  ConfigStore, `config:*`/`ollama:chat` IPC, Settings rewrite, removal of OpenAI/KeyStore/
+  TokenMinter/mic, and wiring the existing notch's text field + Send to Ollama. **Ships a working
+  local app on the current (functional) notch UI.**
+- **Phase B — Cody-style notch.** Rebuild the notch chrome (pill/expand morph, drag+snap, resize,
+  opacity, hover-reveal, click-through) and its content (response area, pagination, collapse,
+  settings gear). Purely presentational; consumes Phase A's pipeline unchanged.
+
+Phase A is sequenced first so we have a functioning local app before touching UI polish.
+
 ## 2. Scope
 
 ### In scope
 
 - Remove OpenAI Realtime entirely: `@openai/agents-realtime` dependency, `tokenMinter.ts`,
   WebRTC session, ephemeral-token minting, `mapServerEvent`, voice in/out.
+
+  **Concrete removals (Phase A):**
+  - `ipcChannels.ts`: drop `KEY_GET_STATUS`, `KEY_SET`, `TOKEN_MINT`, `HISTORY_SET_CAPTURE_SUMMARY`,
+    `IPC_EVENT.KEY_CHANGED`, `IPC_EVENT.HOTKEY_TOGGLE_MUTE`; add `CONFIG_GET`, `CONFIG_SET`,
+    `OLLAMA_CHAT`.
+  - `main/ipc.ts`: strip the `key:*`, `token:mint`, `history:setCaptureSummary` handlers; add
+    `config:*` and `ollama:chat`.
+  - Delete `main/tokenMinter.ts`, `main/keyStore.ts`; `HistoryStore.setCaptureSummary` (dead).
+  - `shared/types.ts`: drop `EphemeralToken`, `KeyStatus`; drop `microphone` from
+    `PermissionStatus`.
+  - `main/permissions.ts` + `settings`: remove mic request/status (`PERM_REQUEST` for mic);
+    screen-recording only.
+  - `shared/session/realtimeEvents.ts` (+ its test) and, per §10, likely
+    `shared/session/sessionState.ts` (+ its test) and `keyStore.test.ts`.
+  - `package.json`: remove `@openai/agents-realtime`.
 - Add an **Ollama client** in the main process: `POST {baseURL}/v1/chat/completions` with a
   vision message (text + base64 image), OpenAI-compatible shape.
 - Rebuild the **notch** to copy Cody's `notch-bubble` behavior:
@@ -104,7 +133,10 @@ User clicks Send
   `POST /v1/chat/completions`; maps our context + image into OpenAI-compatible `messages`
   (vision content array). Handles connection errors (Ollama not running) with a clear message.
 - **ConfigStore** (new, replaces KeyStore) — reads/writes `{ ollamaUrl, model }` as JSON in
-  `userData`. Defaults `http://localhost:11434` + `gemma4:26b`.
+  `userData`. Defaults `http://localhost:11434` + `gemma4:26b`. Exposed to renderers via new IPC
+  channels **`config:get`** → `{ ollamaUrl, model }` and **`config:set`** `(partial)` → updated
+  config. Registered in `main/ipc.ts`; the Settings renderer is rewired from `key:set`/`key:status`
+  to these. The new `ollama:chat` handler reads the current config from ConfigStore.
 - **ScreenCapturer** — **unchanged** (captureWorker + WebP).
 - **HistoryStore** — **unchanged**.
 - **PermissionsManager** — screen-recording only (mic no longer needed).
@@ -147,10 +179,13 @@ Reference: `Cody.app` `electron/notchBubble.js`, `notch-bubble.html`, `appWindow
 ### 4.4 Screen summary (captures.summary)
 
 The old app had the model call `note_screen` to fill `captures.summary`. With no tool loop, we
-fill it more simply: after a turn completes, **store the user's question text as the capture
-summary** (best-effort), so the Dashboard's FTS still indexes what each screenshot was about.
-The column and FTS indexing are unchanged; only the source of the string changes. (A future
-option: a cheap second Ollama call to summarize the image — deferred, YAGNI.)
+fill it **inline at Send time**: when the capture row is persisted (§4.1), set
+`addCapture({ summary: questionText })` using the user's question text, so the Dashboard's FTS
+still indexes what each screenshot was about. The column and FTS indexing are unchanged; only the
+source of the string changes, and it is written in the same step that creates the capture row (no
+second write). Consequently **`HistoryStore.setCaptureSummary` and its
+`HISTORY_SET_CAPTURE_SUMMARY` channel become dead code — removed in Phase A.** (A future option: a
+cheap second Ollama call to summarize the image — deferred, YAGNI.)
 
 ## 5. Data model (SQLite + FTS5)
 
@@ -196,6 +231,8 @@ No migration needed; existing rows remain valid.
     parses the assistant text from a mocked response; maps a connection error to a clear message.
     (Inject `fetch` as a port.)
   - **ConfigStore** — default values; round-trip read/write; malformed-file fallback to defaults.
+  - **Capture→summary wiring** — the Send path persists the capture row with
+    `summary === questionText` (the one behavioral change to the otherwise-unchanged persistence).
   - **Pagination** — existing `pageFor`/`clampIndex` tests stay green (behavior kept).
   - **HistoryStore** — existing tests stay green (schema unchanged).
 - **Delete/replace:** `keyStore.test.ts` (KeyStore removed), `realtimeEvents.test.ts`
