@@ -5,15 +5,14 @@ export const IPC = {
   HISTORY_END_SESSION: "history:endSession",
   HISTORY_ADD_TURN: "history:addTurn",
   HISTORY_ADD_CAPTURE: "history:addCapture",
-  HISTORY_SET_CAPTURE_SUMMARY: "history:setCaptureSummary",
   HISTORY_LIST_SESSIONS: "history:listSessions",
   HISTORY_LIST_TURNS: "history:listTurns",
   HISTORY_LIST_CAPTURES: "history:listCaptures",
   HISTORY_SEARCH: "history:search",
-  // auth/config
-  KEY_GET_STATUS: "key:status",
-  KEY_SET: "key:set",
-  TOKEN_MINT: "token:mint",
+  // config + brain
+  CONFIG_GET: "config:get",
+  CONFIG_SET: "config:set",
+  OLLAMA_CHAT: "ollama:chat",
   // capture
   CAPTURE_SCREEN: "capture:screen",
   CAPTURE_THUMB: "capture:thumb", // read a stored thumbnail file -> data URL (dashboard)
@@ -23,13 +22,10 @@ export const IPC = {
   NOTCH_SET_FOCUSABLE: "notch:setFocusable",
   // permissions
   PERM_STATUS: "perm:status",
-  PERM_REQUEST: "perm:request",
   PERM_OPEN_SCREEN_SETTINGS: "perm:openScreenSettings",
 } as const;
 
 // Main -> renderer broadcast events (not invoke handlers).
 export const IPC_EVENT = {
-  KEY_CHANGED: "key:changed", // notch re-checks key status to enable/disable Start
   HOTKEY_ASK_NOW: "hotkey:askNow",
-  HOTKEY_TOGGLE_MUTE: "hotkey:toggleMute",
 } as const;

@@ -9,6 +9,5 @@ export interface Capture { id: number; sessionId: number; turnId: number | null;
 
 export interface SearchHit { turnId: number | null; captureId: number | null; sessionId: number; snippet: string; createdAt: number; }
 
-export interface EphemeralToken { value: string; expiresAt: number; }
-export interface KeyStatus { hasKey: boolean; }
-export interface PermissionStatus { microphone: "granted" | "denied" | "not-determined"; screen: "granted" | "denied" | "not-determined"; }
+export interface ConfigData { ollamaUrl: string; model: string; }
+export interface PermissionStatus { screen: "granted" | "denied" | "not-determined"; }
