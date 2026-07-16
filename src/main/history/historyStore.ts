@@ -17,6 +17,11 @@ export class HistoryStore {
     this.db.prepare("UPDATE sessions SET status='ended', ended_at=? WHERE id=?").run(Date.now(), id);
   }
 
+  // Reactivate an ended session so the notch can continue appending turns to the same row.
+  reopenSession(id: number): void {
+    this.db.prepare("UPDATE sessions SET status='active', ended_at=NULL WHERE id=?").run(id);
+  }
+
   addTurn(t: Omit<Turn, "id" | "createdAt">): Turn {
     const now = Date.now();
     const info = this.db.prepare(

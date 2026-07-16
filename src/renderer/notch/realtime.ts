@@ -1,6 +1,7 @@
 // src/renderer/notch/realtime.ts
 // Local turn pipeline: capture screen + send text to Ollama, return assistant text.
 // No WebRTC, no live session — one request per Send.
+import type { Turn } from "@shared/types";
 const api = (window as any).api;
 
 const CONTEXT_TURNS = 10; // resend last N turns (text only) for continuity
@@ -11,10 +12,27 @@ export interface ConverseHooks {
   onStatus(s: string): void; // "thinking…" | "" | "error: …"
 }
 
-export async function startConverse(hooks: ConverseHooks) {
+export interface ConverseOptions {
+  continueSessionId?: number; // reopen + resume this existing session instead of creating a new one
+}
+
+export async function startConverse(hooks: ConverseHooks, opts: ConverseOptions = {}) {
   const cfg = await api.invoke("config:get"); // { ollamaUrl, model }
-  const sessionId: number = (await api.invoke("history:startSession", cfg.model)).id;
   const context: Array<{ role: "user" | "assistant"; text: string }> = [];
+  let sessionId: number;
+  let loadedTurns: Turn[] = [];
+
+  if (opts.continueSessionId != null) {
+    // Continue an existing session: reopen it, load its turns, seed context from them.
+    sessionId = opts.continueSessionId;
+    await api.invoke("history:reopenSession", sessionId);
+    loadedTurns = (await api.invoke("history:listTurns", sessionId)) as Turn[];
+    for (const t of loadedTurns) {
+      if (t.role === "user" || t.role === "assistant") context.push({ role: t.role, text: t.text });
+    }
+  } else {
+    sessionId = (await api.invoke("history:startSession", cfg.model)).id;
+  }
 
   async function ask(text: string): Promise<boolean> {
     const q = text.trim();
@@ -57,6 +75,7 @@ export async function startConverse(hooks: ConverseHooks) {
 
   return {
     getSessionId: () => sessionId,
+    loadedTurns, // turns preloaded when continuing a session ([] for a fresh session)
     ask,
     async askNow() { await ask("Describe what is currently on my screen."); },
     async stop() { await api.invoke("history:endSession", sessionId); },

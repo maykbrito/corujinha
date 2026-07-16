@@ -99,6 +99,22 @@ main {
   text-transform: uppercase;
 }
 
+.continue {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #16181c;
+  background: #4fd18b;
+  border: none;
+  border-radius: 6px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.continue:hover {
+  background: #6bdda0;
+}
+
 #turns h3 {
   margin: 16px 0 8px;
   font-size: 12px;

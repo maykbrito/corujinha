@@ -14,6 +14,7 @@ export interface NotchState {
 export interface NotchActions {
   send(text: string): Promise<boolean>; // resolves true if the turn succeeded (clears the field)
   askNow(): void;
+  newSession(): void;
   prev(): void;
   next(): void;
   openDashboard(): void;
@@ -29,7 +30,10 @@ function build(root: HTMLElement, actions: NotchActions): Refs {
     <div id="panel">
       <div class="row top">
         <span id="status" class="status"></span>
-        <a id="dash" class="link nodrag" href="#">dashboard</a>
+        <span class="top-actions">
+          <a id="new" class="link nodrag" href="#">new</a>
+          <a id="dash" class="link nodrag" href="#">dashboard</a>
+        </span>
       </div>
       <div class="turn">
         <span id="role" class="role"></span>
@@ -65,6 +69,7 @@ function build(root: HTMLElement, actions: NotchActions): Refs {
   refs.send.addEventListener("click", submit);
   refs.input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
   root.querySelector<HTMLElement>("#dash")!.addEventListener("click", (e) => { e.preventDefault(); actions.openDashboard(); });
+  root.querySelector<HTMLElement>("#new")!.addEventListener("click", (e) => { e.preventDefault(); actions.newSession(); });
   cache.set(root, refs);
   return refs;
 }

@@ -9,6 +9,9 @@ export const IPC = {
   HISTORY_LIST_TURNS: "history:listTurns",
   HISTORY_LIST_CAPTURES: "history:listCaptures",
   HISTORY_SEARCH: "history:search",
+  HISTORY_REOPEN_SESSION: "history:reopenSession",
+  // session management
+  SESSION_CONTINUE: "session:continue",
   // config + brain
   CONFIG_GET: "config:get",
   CONFIG_SET: "config:set",
@@ -28,4 +31,5 @@ export const IPC = {
 // Main -> renderer broadcast events (not invoke handlers).
 export const IPC_EVENT = {
   HOTKEY_ASK_NOW: "hotkey:askNow",
+  NOTCH_CONTINUE_SESSION: "notch:continueSession", // main -> notch: load + resume a session from history
 } as const;

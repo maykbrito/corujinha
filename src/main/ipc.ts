@@ -2,7 +2,7 @@
 import { ipcMain, BrowserWindow, app, shell } from "electron";
 import { join, resolve } from "path";
 import { existsSync, readFileSync } from "fs";
-import { IPC } from "@shared/ipcChannels";
+import { IPC, IPC_EVENT } from "@shared/ipcChannels";
 import type { HistoryStore } from "./history/historyStore";
 import type { ScreenCapturer } from "./screenCapturer";
 import type { Turn, Capture } from "@shared/types";
@@ -35,6 +35,15 @@ export function registerIpc(deps: {
   ipcMain.handle(IPC.HISTORY_LIST_TURNS, (_e, id: number) => deps.history.listTurns(id));
   ipcMain.handle(IPC.HISTORY_LIST_CAPTURES, (_e, id: number) => deps.history.listCaptures(id));
   ipcMain.handle(IPC.HISTORY_SEARCH, (_e, q: string) => deps.history.search(q));
+  ipcMain.handle(IPC.HISTORY_REOPEN_SESSION, (_e, id: number) => deps.history.reopenSession(id));
+
+  // Continue a session from the Dashboard: reveal the notch and tell it to load + resume `id`.
+  ipcMain.handle(IPC.SESSION_CONTINUE, (_e, id: number) => {
+    const notch = deps.getNotch();
+    if (!notch) return;
+    notch.show();
+    notch.webContents.send(IPC_EVENT.NOTCH_CONTINUE_SESSION, id);
+  });
 
   // Read a stored capture thumbnail into a data URL for the dashboard. Restricted to the
   // app's captures directory so a renderer can't read arbitrary files.

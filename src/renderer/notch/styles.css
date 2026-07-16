@@ -37,6 +37,11 @@ body {
   justify-content: space-between;
 }
 
+.top-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .status {
   color: #6cf;
   font-size: 11px;

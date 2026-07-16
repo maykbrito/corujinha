@@ -42,8 +42,13 @@ function renderSessionList(sessions: Session[]) {
     const when = new Date(s.startedAt).toLocaleString();
     el.innerHTML =
       `<div class="session-head">Session #${s.id} · ${escapeHtml(s.mode)} · ${escapeHtml(when)}` +
-      `<span class="tag">${s.status}</span></div>`;
+      `<span class="tag">${s.status}</span>` +
+      `<button class="continue nodrag" title="Load this session into the notch and keep talking">Continue</button></div>`;
     el.querySelector(".session-head")!.addEventListener("click", () => loadSession(s.id));
+    el.querySelector(".continue")!.addEventListener("click", (e) => {
+      e.stopPropagation(); // don't also trigger the transcript view
+      api.invoke("session:continue", s.id);
+    });
     resultsEl.appendChild(el);
   }
 }

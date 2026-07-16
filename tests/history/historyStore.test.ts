@@ -45,6 +45,19 @@ describe("HistoryStore", () => {
     expect(found.endedAt).not.toBeNull();
   });
 
+  it("reopens an ended session (active again, endedAt cleared)", () => {
+    const s = store.startSession("m");
+    store.endSession(s.id);
+    store.reopenSession(s.id);
+    const found = store.listSessions().find(x => x.id === s.id)!;
+    expect(found.status).toBe("active");
+    expect(found.endedAt).toBeNull();
+  });
+
+  it("reopenSession is a no-op for a missing id", () => {
+    expect(() => store.reopenSession(9999)).not.toThrow();
+  });
+
   it("full-text searches turn text and capture summaries", () => {
     const s = store.startSession("m");
     store.addTurn({ sessionId: s.id, role: "assistant", source: "voice", text: "explain the load balancer" });
