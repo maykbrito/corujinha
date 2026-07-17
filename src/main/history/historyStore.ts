@@ -22,6 +22,11 @@ export class HistoryStore {
     this.db.prepare("UPDATE sessions SET status='active', ended_at=NULL WHERE id=?").run(id);
   }
 
+  // Close any still-active session (called on quit so nothing is left dangling as 'active').
+  endActiveSessions(): void {
+    this.db.prepare("UPDATE sessions SET status='ended', ended_at=? WHERE status='active'").run(Date.now());
+  }
+
   addTurn(t: Omit<Turn, "id" | "createdAt">): Turn {
     const now = Date.now();
     const info = this.db.prepare(
