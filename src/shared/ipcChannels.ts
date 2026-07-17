@@ -32,6 +32,8 @@ export const IPC = {
   // permissions
   PERM_STATUS: "perm:status",
   PERM_OPEN_SCREEN_SETTINGS: "perm:openScreenSettings",
+  // shortcuts
+  SHORTCUTS_RELOAD: "shortcuts:reload", // renderer -> main: re-register global shortcuts from config
 } as const;
 
 // Main -> renderer broadcast events (not invoke handlers).
@@ -39,4 +41,6 @@ export const IPC_EVENT = {
   HOTKEY_ASK_NOW: "hotkey:askNow",
   NOTCH_CONTINUE_SESSION: "notch:continueSession", // main -> notch: load + resume a session from history
   NOTCH_SET_OPACITY: "notch:setOpacity", // main -> notch: apply an opacity changed from Settings
+  NOTCH_PAGE: "notch:page", // main -> notch: paginate turns ("prev" | "next")
+  NOTCH_SCROLL: "notch:scroll", // main -> notch: scroll the answer ("up" | "down")
 } as const;

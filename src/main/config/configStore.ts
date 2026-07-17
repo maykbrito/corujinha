@@ -1,5 +1,17 @@
-export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; opacity: number; }
-export const DEFAULT_CONFIG: ConfigData = { ollamaUrl: "http://localhost:11434", model: "gemma4:26b", hideFromCapture: true, opacity: 1 };
+export interface ShortcutMap { scrollUp: string; scrollDown: string; prevPage: string; nextPage: string; }
+export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; opacity: number; shortcuts: ShortcutMap; }
+export const DEFAULT_CONFIG: ConfigData = {
+  ollamaUrl: "http://localhost:11434",
+  model: "gemma4:26b",
+  hideFromCapture: true,
+  opacity: 1,
+  shortcuts: {
+    scrollUp: "CommandOrControl+Shift+Up",
+    scrollDown: "CommandOrControl+Shift+Down",
+    prevPage: "CommandOrControl+Shift+Left",
+    nextPage: "CommandOrControl+Shift+Right",
+  },
+};
 
 export interface ConfigDisk { read(): string | null; write(s: string): void; }
 

@@ -9,55 +9,85 @@
   <body>
     <h1>Settings</h1>
 
-    <section>
-      <h2>Ollama</h2>
-      <p class="hint">Local model server. Defaults to http://localhost:11434 running gemma4:26b.</p>
-      <div class="row">
-        <label>Base URL</label>
-        <input id="ollama-url" type="text" placeholder="http://localhost:11434" />
-      </div>
-      <div class="row">
-        <label>Model</label>
-        <input id="ollama-model" type="text" placeholder="gemma4:26b" />
-      </div>
-      <button id="save-config">Save</button>
-      <p id="config-status" class="status"></p>
-    </section>
+    <div class="tabs">
+      <button class="tab active" data-tab="general">General</button>
+      <button class="tab" data-tab="shortcuts">Shortcuts</button>
+    </div>
 
-    <section>
-      <h2>Appearance</h2>
-      <p class="hint">Notch background opacity.</p>
-      <div class="row">
-        <label>Opacity</label>
-        <input id="opacity" type="range" min="0.45" max="1" step="0.05" />
-        <span id="opacity-val" class="opacity-val"></span>
-      </div>
-    </section>
+    <div class="tab-panel active" id="tab-general">
+      <section>
+        <h2>Ollama</h2>
+        <p class="hint">Local model server. Defaults to http://localhost:11434 running gemma4:26b.</p>
+        <div class="row">
+          <label>Base URL</label>
+          <input id="ollama-url" type="text" placeholder="http://localhost:11434" />
+        </div>
+        <div class="row">
+          <label>Model</label>
+          <input id="ollama-model" type="text" placeholder="gemma4:26b" />
+        </div>
+        <button id="save-config">Save</button>
+        <p id="config-status" class="status"></p>
+      </section>
 
-    <section>
-      <h2>Privacy</h2>
-      <p class="hint">When on, the notch window is excluded from screen recordings and screenshots.</p>
-      <div class="row">
-        <label><input id="hide-from-capture" type="checkbox" /> Hide notch from screen capture</label>
-      </div>
-    </section>
+      <section>
+        <h2>Appearance</h2>
+        <p class="hint">Notch background opacity.</p>
+        <div class="row">
+          <label>Opacity</label>
+          <input id="opacity" type="range" min="0.45" max="1" step="0.05" />
+          <span id="opacity-val" class="opacity-val"></span>
+        </div>
+      </section>
 
-    <section>
-      <h2>Permissions</h2>
-      <div class="perm">
-        <span>Screen Recording: <b id="screen-status">…</b></span>
-        <button id="open-screen">Open Screen Recording settings</button>
-      </div>
-    </section>
+      <section>
+        <h2>Privacy</h2>
+        <p class="hint">When on, the notch window is excluded from screen recordings and screenshots.</p>
+        <div class="row">
+          <label><input id="hide-from-capture" type="checkbox" /> Hide notch from screen capture</label>
+        </div>
+      </section>
 
-    <section>
-      <h2>Shortcuts</h2>
-      <p class="hint">Editing is not available in v1.</p>
-      <ul class="shortcuts">
-        <li><kbd>⌘⇧A</kbd> Ask now</li>
-        <li><kbd>⌘⇧H</kbd> Show / hide notch</li>
-      </ul>
-    </section>
+      <section>
+        <h2>Permissions</h2>
+        <div class="perm">
+          <span>Screen Recording: <b id="screen-status">…</b></span>
+          <button id="open-screen">Open Screen Recording settings</button>
+        </div>
+      </section>
+    </div>
+
+    <div class="tab-panel" id="tab-shortcuts">
+      <section>
+        <h2>Global shortcuts</h2>
+        <p class="hint">Work system-wide. Click a field and press the key combo you want (needs at least one modifier).</p>
+        <div class="row shortcut-row">
+          <label>Previous answer</label>
+          <input class="shortcut-input" data-shortcut="prevPage" type="text" readonly placeholder="Press shortcut…" />
+        </div>
+        <div class="row shortcut-row">
+          <label>Next answer</label>
+          <input class="shortcut-input" data-shortcut="nextPage" type="text" readonly placeholder="Press shortcut…" />
+        </div>
+        <div class="row shortcut-row">
+          <label>Scroll up</label>
+          <input class="shortcut-input" data-shortcut="scrollUp" type="text" readonly placeholder="Press shortcut…" />
+        </div>
+        <div class="row shortcut-row">
+          <label>Scroll down</label>
+          <input class="shortcut-input" data-shortcut="scrollDown" type="text" readonly placeholder="Press shortcut…" />
+        </div>
+        <p id="shortcut-status" class="status"></p>
+      </section>
+
+      <section>
+        <h2>Fixed</h2>
+        <ul class="shortcuts">
+          <li><kbd>⌘⇧A</kbd> Ask now</li>
+          <li><kbd>⌘⇧H</kbd> Show / hide notch</li>
+        </ul>
+      </section>
+    </div>
 
     <script type="module" src="./main.ts"></script>
   </body>

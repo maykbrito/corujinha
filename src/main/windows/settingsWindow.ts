@@ -5,6 +5,11 @@ import { join } from "path";
 // Lazily-created normal window; focus if already open.
 let win: BrowserWindow | null = null;
 
+// The Settings window is the only "real" window authorized to quit the app (Cody model).
+export function getSettingsWindow(): BrowserWindow | null {
+  return win && !win.isDestroyed() ? win : null;
+}
+
 export function openSettingsWindow(): BrowserWindow {
   if (win && !win.isDestroyed()) {
     win.focus();

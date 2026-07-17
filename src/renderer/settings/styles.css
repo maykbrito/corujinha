@@ -16,6 +16,37 @@ h1 {
   margin: 0 0 16px;
 }
 
+/* Tabs */
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid #2a2d33;
+  margin-bottom: 4px;
+}
+.tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  color: #7c828c;
+  padding: 8px 12px;
+}
+.tab:hover { background: none; color: #e6e6e6; }
+.tab.active { color: #e6e6e6; border-bottom-color: #4fd18b; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Shortcut recorder inputs */
+.shortcut-input {
+  text-align: center;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+}
+.shortcut-input:focus {
+  border-color: #4fd18b;
+  outline: none;
+}
+
 section {
   border-top: 1px solid #2a2d33;
   padding: 14px 0;

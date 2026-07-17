@@ -234,6 +234,12 @@ api.on("hotkey:askNow", () => actions.askNow());
 api.on("notch:continueSession", (id: number) => { void continueSession(id); });
 // Opacity is owned by config now; Settings edits it and main pushes changes here.
 api.on("notch:setOpacity", (v: number) => { opacity = clampOpacity(v); applyOpacity(); });
+// Global navigation shortcuts (registered in main) drive pagination + scroll here.
+api.on("notch:page", (dir: string) => { dir === "prev" ? actions.prev() : actions.next(); });
+api.on("notch:scroll", (dir: string) => {
+  const amount = Math.max(60, refs.contentEl.clientHeight * 0.6);
+  refs.contentEl.scrollBy({ top: dir === "up" ? -amount : amount, behavior: "smooth" });
+});
 
 // ---- startup ----
 api.invoke("config:get").then((c: any) => { opacity = clampOpacity(c?.opacity ?? 1); applyOpacity(); });
