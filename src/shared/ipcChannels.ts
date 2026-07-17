@@ -38,4 +38,5 @@ export const IPC = {
 export const IPC_EVENT = {
   HOTKEY_ASK_NOW: "hotkey:askNow",
   NOTCH_CONTINUE_SESSION: "notch:continueSession", // main -> notch: load + resume a session from history
+  NOTCH_SET_OPACITY: "notch:setOpacity", // main -> notch: apply an opacity changed from Settings
 } as const;

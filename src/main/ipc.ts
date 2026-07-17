@@ -28,6 +28,10 @@ export function registerIpc(deps: {
   ipcMain.handle(IPC.CONFIG_SET, (_e, partial) => {
     const next = config.set(partial);
     applyContentProtection();
+    if (partial && "opacity" in partial) {
+      const notch = deps.getNotch();
+      if (notch && !notch.isDestroyed()) notch.webContents.send(IPC_EVENT.NOTCH_SET_OPACITY, next.opacity);
+    }
     return next;
   });
   ipcMain.handle(IPC.OLLAMA_CHAT, (_e, messages: ChatMessage[]) => ollamaChat(fetch, config.get(), messages));

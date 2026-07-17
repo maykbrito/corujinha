@@ -35,6 +35,26 @@ h2 {
 .row {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+input[type="checkbox"],
+input[type="range"] {
+  flex: 0 0 auto;
+}
+input[type="range"] {
+  flex: 1;
+  padding: 0;
+}
+.row > label {
+  flex: 0 0 auto;
+  min-width: 64px;
+}
+.opacity-val {
+  flex: 0 0 auto;
+  min-width: 40px;
+  text-align: right;
+  color: #7c828c;
 }
 
 input {

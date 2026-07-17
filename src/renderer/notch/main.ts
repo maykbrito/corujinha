@@ -23,7 +23,7 @@ let turnSeq = 0; // monotonic local id for rendered turns (not the DB rowid)
 type Morph = "collapsed" | "expanding" | "expanded" | "collapsing";
 let morph: Morph = "collapsed";
 let pinned = true;
-let opacity = clampOpacity(parseFloat(localStorage.getItem("notchOpacity") || "1"));
+let opacity = 1; // 0.45..1; sourced from config, live-synced from Settings
 let size = loadSize();
 
 function loadSize() {
@@ -35,7 +35,7 @@ function loadSize() {
 }
 
 function render() {
-  const state: NotchState = { turns, index, statusLabel, opacity };
+  const state: NotchState = { turns, index, statusLabel };
   renderNotch(root, state, actions);
 }
 function pushTurn(role: Turn["role"], text: string) {
@@ -80,7 +80,7 @@ const actions: NotchActions = {
   prev() { index = Math.max(0, index - 1); render(); },
   next() { index = Math.min(turns.length - 1, index + 1); render(); },
   openDashboard() { api.invoke("window:openDashboard"); },
-  setOpacity(v) { opacity = clampOpacity(v); applyOpacity(); localStorage.setItem("notchOpacity", String(opacity)); },
+  openSettings() { api.invoke("window:openSettings"); },
   regenerate() { converse?.regenerate().catch(() => {}); },
   suggestFollowUps() { return converse?.suggestFollowUps().catch(() => []) ?? Promise.resolve([]); },
 };
@@ -103,7 +103,7 @@ function collapse() {
   if (morph === "collapsed" || morph === "collapsing") return;
   morph = "collapsing";
   refs.shape.classList.add("collapsing");
-  refs.shape.classList.remove("expanded", "show-settings");
+  refs.shape.classList.remove("expanded");
   setCollapseIcon(refs, false);
 }
 refs.shape.addEventListener("transitionend", (e) => {
@@ -118,7 +118,6 @@ refs.collapseBtn.addEventListener("click", (e) => {
   if (morph === "expanded") collapse();
   else if (morph === "collapsed") expand();
 });
-refs.gearBtn.addEventListener("click", (e) => { e.stopPropagation(); if (morph === "expanded") refs.shape.classList.toggle("show-settings"); });
 
 // ---- click-through ----
 function isInsideShape(e: MouseEvent) {
@@ -233,8 +232,10 @@ document.addEventListener("mouseup", (e) => {
 // ---- global-shortcut + dashboard-continue relays ----
 api.on("hotkey:askNow", () => actions.askNow());
 api.on("notch:continueSession", (id: number) => { void continueSession(id); });
+// Opacity is owned by config now; Settings edits it and main pushes changes here.
+api.on("notch:setOpacity", (v: number) => { opacity = clampOpacity(v); applyOpacity(); });
 
 // ---- startup ----
-applyOpacity();
+api.invoke("config:get").then((c: any) => { opacity = clampOpacity(c?.opacity ?? 1); applyOpacity(); });
 api.invoke("notch:resize", size.width, size.height); // set the OS window to the persisted panel size
 render();
