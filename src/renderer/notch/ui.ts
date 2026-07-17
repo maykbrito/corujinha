@@ -8,11 +8,38 @@ import { renderMarkdown } from "@shared/notchMarkdown";
 import type { Turn } from "@shared/types";
 import {
   createElement, GripHorizontal, Plus, LayoutGrid, Contrast,
-  ChevronUp, ChevronDown, RefreshCw, Sparkles,
+  ChevronUp, ChevronDown, RefreshCw, Sparkles, SendHorizontal,
 } from "lucide";
 
 function setIcon(el: HTMLElement, node: Parameters<typeof createElement>[0]) {
   el.replaceChildren(createElement(node));
+}
+
+// Custom tooltip: one element appended to <body> (outside .notch-shape's overflow:hidden so
+// it isn't clipped by the collapsed pill), positioned under whatever element is hovered.
+function initTooltips(els: HTMLElement[]): void {
+  let tip = document.querySelector<HTMLElement>(".notch-tip");
+  if (!tip) {
+    tip = document.createElement("div");
+    tip.className = "notch-tip";
+    document.body.appendChild(tip);
+  }
+  const tipEl = tip;
+  const show = (el: HTMLElement) => {
+    const text = el.getAttribute("title");
+    if (!text) return;
+    tipEl.textContent = text;
+    const rect = el.getBoundingClientRect();
+    tipEl.style.left = `${rect.left + rect.width / 2}px`;
+    tipEl.style.top = `${rect.bottom + 6}px`;
+    tipEl.classList.add("show");
+  };
+  const hide = () => tipEl.classList.remove("show");
+  for (const el of els) {
+    el.addEventListener("mouseenter", () => show(el));
+    el.addEventListener("mouseleave", hide);
+    el.addEventListener("click", hide); // dismiss on action
+  }
 }
 
 export interface NotchState {
@@ -78,21 +105,21 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
             <span class="notch-role" id="role"></span>
             <div class="notch-content" id="content"></div>
           </div>
-          <div class="notch-nav">
-            <button id="prev">‹</button>
-            <span class="count" id="count"></span>
-            <button id="next">›</button>
-          </div>
           <div class="notch-followups">
             <div class="notch-followup-actions">
               <button id="regen" class="notch-textbtn" title="Regenerate answer"></button>
               <button id="suggest" class="notch-textbtn" title="Suggest follow-up questions"></button>
+              <div class="notch-nav">
+                <button id="prev" title="Previous">‹</button>
+                <span class="count" id="count"></span>
+                <button id="next" title="Next">›</button>
+              </div>
             </div>
             <div class="notch-chips" id="chips"></div>
           </div>
           <div class="notch-typebox">
             <input id="msg" type="text" placeholder="Ask about your screen…" />
-            <button id="send" class="primary">Send</button>
+            <button id="send" class="primary" title="Send"></button>
           </div>
         </div>
         <div class="notch-settings-view">
@@ -123,6 +150,11 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
   setCollapseIcon(r, false); // starts collapsed → shows "expand" affordance
   r.regenBtn.replaceChildren(createElement(RefreshCw), Object.assign(document.createElement("span"), { textContent: "Regenerate" }));
   r.suggestBtn.replaceChildren(createElement(Sparkles), Object.assign(document.createElement("span"), { textContent: "Follow-ups" }));
+  setIcon(r.send, SendHorizontal);
+
+  // Native tooltips don't render on a non-activating panel window, so drive our own from
+  // each element's title attribute.
+  initTooltips([r.grip, r.newBtn, root.querySelector<HTMLElement>("#dash")!, r.gearBtn, r.collapseBtn, r.send]);
 
   const submit = async () => {
     const v = r.input.value.trim();
