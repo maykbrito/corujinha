@@ -570,7 +570,7 @@ git commit -m "feat: notch morph-shape HTML/CSS (pill<->panel, hover-reveal, opa
 Builds the full `.notch-shape` DOM once (header with gear+collapse, inner with content-area + settings sub-panel, resize handles), caches refs, and on render updates: status, current turn (role + `renderMarkdown(text)`), pagination counter/buttons, and the opacity slider value. Exposes the DOM refs the controller (main.ts) needs for the state machine + drag/resize.
 
 Key requirements:
-- `NotchState` gains `opacity: number`. `NotchActions` keeps `send/askNow/prev/next/openDashboard` and adds `setOpacity(v: number)` and `toggleCollapsed()`. **Pin this exact contract** (Task 6 and Task 7 must agree):
+- `NotchState` gains `opacity: number`. `NotchActions` keeps `send/askNow/newSession/prev/next/openDashboard` and adds `setOpacity(v: number)` and `toggleCollapsed()`. **Pin this exact contract** (Task 6 and Task 7 must agree):
 
 ```ts
 // src/renderer/notch/ui.ts — exported interfaces (locked contract)
@@ -584,6 +584,7 @@ export interface NotchState {
 export interface NotchActions {
   send(text: string): Promise<boolean>; // clears input only on true (spec §7)
   askNow(): void;
+  newSession(): void;                    // PRESERVE: end current session + clear (existing feature)
   prev(): void;
   next(): void;
   openDashboard(): void;
@@ -593,12 +594,14 @@ export interface NotchActions {
 // buildNotch returns the DOM refs main.ts attaches drag/resize/morph listeners to:
 export interface NotchRefs {
   shape: HTMLElement; header: HTMLElement; collapseBtn: HTMLElement; gearBtn: HTMLElement;
-  resizeRight: HTMLElement; resizeBottom: HTMLElement; input: HTMLInputElement;
+  newBtn: HTMLElement; resizeRight: HTMLElement; resizeBottom: HTMLElement; input: HTMLInputElement;
   opacitySlider: HTMLInputElement;
 }
 export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs;
 export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void;
 ```
+
+> **PRESERVE existing session-management features** (added after this plan was written): the notch must keep a **New** control (`actions.newSession()`) in the Cody chrome (e.g. a small header button), and `main.ts` must keep the `notch:continueSession` event listener + `continueSession(id)` logic that calls `startConverse(hooks, { continueSessionId: id })` and renders `converse.loadedTurns`. Do NOT drop these in the rebuild.
 
 - The assistant/user turn text is rendered via `renderMarkdown` (import from `@shared/notchMarkdown`) into `.notch-content` (innerHTML), NOT textContent.
 - The input + Send live in the footer of the inner panel; Enter submits (preserve Phase A behavior: clear only on success).
@@ -627,7 +630,7 @@ Port the interaction logic from `docs/superpowers/reference/cody/notch-bubble.ht
 - **Resize** right/bottom handles with clamp + localStorage (port :1798-1882). Uses `notch:resize`. Import `NOTCH`/`clampSize` from `@shared/notchGeometry` (single source of truth, shared with the main controller).
 - **Opacity** slider → `setOpacity` persists to localStorage, sets `--notch-background-opacity`.
 - **Click-through**: on pointer enter/inside → `notch:setIgnoreMouse(false)`; on leave (not dragging/resizing) → `notch:setIgnoreMouse(true,{forward:true})` (port :2778-2811).
-- **Turn wiring**: reuse Phase A controller logic (lazy `ensureConverse`, `pushTurn`, `send` returns success, `askNow`, `prev`/`next`, hotkey relay).
+- **Turn wiring**: reuse Phase A controller logic (lazy `ensureConverse`, `pushTurn`, `send` returns success, `askNow`, `prev`/`next`, hotkey relay). **PRESERVE** `newSession()` and the `notch:continueSession` event → `continueSession(id)` (calls `startConverse(hooks,{continueSessionId:id})`, renders `converse.loadedTurns`) — both added after this plan and currently working.
 - **End session**: no renderer involvement — main ends active sessions synchronously on quit (Task 3b). `converse.stop()` is no longer called from the renderer; it may be removed from the returned handle or left unused (note which).
 
 - [ ] **Step 1** Implement `main.ts` per above.
