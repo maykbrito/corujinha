@@ -2,6 +2,7 @@
 // Local turn pipeline: capture screen + send text to Ollama, return assistant text.
 // No WebRTC, no live session — one request per Send.
 import type { Turn } from "@shared/types";
+import { parseFollowUps } from "@shared/followUps";
 const api = (window as any).api;
 
 const CONTEXT_TURNS = 10; // resend last N turns (text only) for continuity
@@ -78,6 +79,47 @@ export async function startConverse(hooks: ConverseHooks, opts: ConverseOptions 
     loadedTurns, // turns preloaded when continuing a session ([] for a fresh session)
     ask,
     async askNow() { await ask("Describe what is currently on my screen."); },
+
+    // Re-answer the last question, keeping both answers (main pushes a new turn → paginated).
+    // Text-only regen: no fresh screenshot, just a new pass over the existing context.
+    async regenerate(): Promise<boolean> {
+      const lastUser = [...context].reverse().find((m) => m.role === "user");
+      if (!lastUser) return false;
+      // Context up to and including the last user message (drop a trailing assistant answer).
+      const upTo = context[context.length - 1]?.role === "assistant" ? context.slice(0, -1) : context.slice();
+      const messages = upTo.slice(-CONTEXT_TURNS).map((m) => ({ role: m.role, text: m.text }));
+      try {
+        hooks.onStatus("thinking…");
+        const reply: string = await api.invoke("ollama:chat", messages);
+        await api.invoke("history:addTurn", { sessionId, role: "assistant", source: "typed", text: reply });
+        context.push({ role: "assistant", text: reply });
+        hooks.onAssistantText(reply);
+        hooks.onStatus("");
+        return true;
+      } catch (e) {
+        hooks.onStatus(`error: ${String(e)}`);
+        return false;
+      }
+    },
+
+    // One text-only call: ask the model for up to 3 short follow-up questions. Not saved to history.
+    async suggestFollowUps(): Promise<string[]> {
+      if (!context.some((m) => m.role === "assistant")) return [];
+      const messages = [
+        ...context.slice(-CONTEXT_TURNS).map((m) => ({ role: m.role, text: m.text })),
+        {
+          role: "user" as const,
+          text: "Suggest 3 short follow-up questions I could ask next. Reply with ONLY the questions, one per line, no numbering, no other text.",
+        },
+      ];
+      try {
+        const reply: string = await api.invoke("ollama:chat", messages);
+        return parseFollowUps(reply);
+      } catch {
+        return [];
+      }
+    },
+
     async stop() { await api.invoke("history:endSession", sessionId); },
   };
 }

@@ -9,6 +9,7 @@ const urlInput = document.getElementById("ollama-url") as HTMLInputElement;
 const modelInput = document.getElementById("ollama-model") as HTMLInputElement;
 const saveBtn = document.getElementById("save-config") as HTMLButtonElement;
 const cfgStatus = document.getElementById("config-status")!;
+const hideFromCapture = document.getElementById("hide-from-capture") as HTMLInputElement;
 const screenStatusEl = document.getElementById("screen-status")!;
 const openScreenBtn = document.getElementById("open-screen") as HTMLButtonElement;
 
@@ -16,12 +17,21 @@ async function loadConfig() {
   const c = (await api.invoke("config:get")) as ConfigData;
   urlInput.value = c.ollamaUrl;
   modelInput.value = c.model;
+  hideFromCapture.checked = c.hideFromCapture;
 }
 saveBtn.addEventListener("click", async () => {
-  await api.invoke("config:set", { ollamaUrl: urlInput.value.trim(), model: modelInput.value.trim() });
+  await api.invoke("config:set", {
+    ollamaUrl: urlInput.value.trim(),
+    model: modelInput.value.trim(),
+    hideFromCapture: hideFromCapture.checked,
+  });
   cfgStatus.textContent = "✓ Saved.";
   cfgStatus.className = "status ok";
 });
+// Apply capture visibility immediately on toggle (no need to hit Save).
+hideFromCapture.addEventListener("change", () =>
+  api.invoke("config:set", { hideFromCapture: hideFromCapture.checked }),
+);
 async function refreshPermissions() {
   const p = (await api.invoke("perm:status")) as PermissionStatus;
   screenStatusEl.textContent = p.screen;

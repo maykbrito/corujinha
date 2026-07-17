@@ -4,7 +4,7 @@
 //  - the turn pipeline (Phase A) + session management (New / Continue),
 //  - the Cody-style morph state machine (pill <-> panel),
 //  - drag-with-snap, edge resize, opacity tint, and click-through toggling.
-import { buildNotch, renderNotch, type NotchState, type NotchActions, type NotchRefs } from "./ui";
+import { buildNotch, renderNotch, setCollapseIcon, type NotchState, type NotchActions, type NotchRefs } from "./ui";
 import { startConverse, type Converse, type ConverseHooks } from "./realtime";
 import { NOTCH, clampSize, clampOpacity, snapDistance } from "@shared/notchGeometry";
 import type { Turn } from "@shared/types";
@@ -81,6 +81,8 @@ const actions: NotchActions = {
   next() { index = Math.min(turns.length - 1, index + 1); render(); },
   openDashboard() { api.invoke("window:openDashboard"); },
   setOpacity(v) { opacity = clampOpacity(v); applyOpacity(); localStorage.setItem("notchOpacity", String(opacity)); },
+  regenerate() { converse?.regenerate().catch(() => {}); },
+  suggestFollowUps() { return converse?.suggestFollowUps().catch(() => []) ?? Promise.resolve([]); },
 };
 
 // ---- build + wire chrome ----
@@ -95,12 +97,14 @@ function expand() {
   morph = "expanding";
   refs.shape.classList.add("expanded");
   morph = "expanded";
+  setCollapseIcon(refs, true);
 }
 function collapse() {
   if (morph === "collapsed" || morph === "collapsing") return;
   morph = "collapsing";
   refs.shape.classList.add("collapsing");
   refs.shape.classList.remove("expanded", "show-settings");
+  setCollapseIcon(refs, false);
 }
 refs.shape.addEventListener("transitionend", (e) => {
   if (e.propertyName === "height" && morph === "collapsing") {
@@ -108,7 +112,12 @@ refs.shape.addEventListener("transitionend", (e) => {
     refs.shape.classList.remove("collapsing");
   }
 });
-refs.collapseBtn.addEventListener("click", (e) => { e.stopPropagation(); collapse(); });
+// The collapse button toggles: minimize when expanded, expand when collapsed.
+refs.collapseBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  if (morph === "expanded") collapse();
+  else if (morph === "collapsed") expand();
+});
 refs.gearBtn.addEventListener("click", (e) => { e.stopPropagation(); if (morph === "expanded") refs.shape.classList.toggle("show-settings"); });
 
 // ---- click-through ----

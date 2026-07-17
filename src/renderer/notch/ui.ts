@@ -6,6 +6,14 @@
 import { pageFor } from "@shared/session/pagination";
 import { renderMarkdown } from "@shared/notchMarkdown";
 import type { Turn } from "@shared/types";
+import {
+  createElement, GripHorizontal, Plus, LayoutGrid, Contrast,
+  ChevronUp, ChevronDown, RefreshCw, Sparkles,
+} from "lucide";
+
+function setIcon(el: HTMLElement, node: Parameters<typeof createElement>[0]) {
+  el.replaceChildren(createElement(node));
+}
 
 export interface NotchState {
   turns: Turn[];
@@ -22,11 +30,14 @@ export interface NotchActions {
   next(): void;
   openDashboard(): void;
   setOpacity(v: number): void;
+  regenerate(): void; // re-answer the last question, keeping both (paginated)
+  suggestFollowUps(): Promise<string[]>; // one text-only call -> up to 3 follow-up questions
 }
 
 export interface NotchRefs {
   shape: HTMLElement;
   header: HTMLElement;
+  grip: HTMLElement;
   newBtn: HTMLElement;
   gearBtn: HTMLElement;
   collapseBtn: HTMLElement;
@@ -41,6 +52,9 @@ export interface NotchRefs {
   prev: HTMLButtonElement;
   next: HTMLButtonElement;
   send: HTMLButtonElement;
+  regenBtn: HTMLButtonElement;
+  suggestBtn: HTMLButtonElement;
+  chipsEl: HTMLElement;
 }
 
 let refs: NotchRefs | null = null;
@@ -49,12 +63,13 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
   root.innerHTML = `
     <div class="notch-shape" id="shape">
       <div class="notch-header" id="header">
+        <span class="notch-grip" id="grip" title="Drag to move"></span>
         <span class="notch-status" id="status"></span>
         <div class="notch-header-actions">
-          <button class="notch-hbtn" id="new" title="New session">+</button>
-          <button class="notch-hbtn" id="dash" title="Dashboard">☰</button>
-          <button class="notch-hbtn" id="gear" title="Opacity">◐</button>
-          <button class="notch-hbtn" id="collapse" title="Collapse">▲</button>
+          <button class="notch-hbtn" id="new" title="New session"></button>
+          <button class="notch-hbtn" id="dash" title="Dashboard"></button>
+          <button class="notch-hbtn" id="gear" title="Opacity"></button>
+          <button class="notch-hbtn" id="collapse" title="Minimize"></button>
         </div>
       </div>
       <div class="notch-inner">
@@ -67,6 +82,13 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
             <button id="prev">‹</button>
             <span class="count" id="count"></span>
             <button id="next">›</button>
+          </div>
+          <div class="notch-followups">
+            <div class="notch-followup-actions">
+              <button id="regen" class="notch-textbtn" title="Regenerate answer"></button>
+              <button id="suggest" class="notch-textbtn" title="Suggest follow-up questions"></button>
+            </div>
+            <div class="notch-chips" id="chips"></div>
           </div>
           <div class="notch-typebox">
             <input id="msg" type="text" placeholder="Ask about your screen…" />
@@ -84,13 +106,23 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
 
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>(`#${id}`)!;
   const r: NotchRefs = {
-    shape: $("shape"), header: $("header"),
+    shape: $("shape"), header: $("header"), grip: $("grip"),
     newBtn: $("new"), gearBtn: $("gear"), collapseBtn: $("collapse"),
     resizeRight: $("resizeRight"), resizeBottom: $("resizeBottom"),
     input: $<HTMLInputElement>("msg"), opacitySlider: $<HTMLInputElement>("opacity"),
     statusEl: $("status"), roleEl: $("role"), contentEl: $("content"), countEl: $("count"),
     prev: $<HTMLButtonElement>("prev"), next: $<HTMLButtonElement>("next"), send: $<HTMLButtonElement>("send"),
+    regenBtn: $<HTMLButtonElement>("regen"), suggestBtn: $<HTMLButtonElement>("suggest"), chipsEl: $("chips"),
   };
+
+  // Icons (Lucide). Tooltips come from each element's title attribute above.
+  setIcon(r.grip, GripHorizontal);
+  setIcon(r.newBtn, Plus);
+  setIcon(root.querySelector<HTMLElement>("#dash")!, LayoutGrid);
+  setIcon(r.gearBtn, Contrast);
+  setCollapseIcon(r, false); // starts collapsed → shows "expand" affordance
+  r.regenBtn.replaceChildren(createElement(RefreshCw), Object.assign(document.createElement("span"), { textContent: "Regenerate" }));
+  r.suggestBtn.replaceChildren(createElement(Sparkles), Object.assign(document.createElement("span"), { textContent: "Follow-ups" }));
 
   const submit = async () => {
     const v = r.input.value.trim();
@@ -109,9 +141,39 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
   r.newBtn.addEventListener("click", (e) => { e.stopPropagation(); actions.newSession(); });
   root.querySelector<HTMLElement>("#dash")!.addEventListener("click", (e) => { e.stopPropagation(); actions.openDashboard(); });
   r.opacitySlider.addEventListener("input", () => actions.setOpacity(parseFloat(r.opacitySlider.value)));
+  r.regenBtn.addEventListener("click", () => actions.regenerate());
+  r.suggestBtn.addEventListener("click", async () => {
+    r.suggestBtn.disabled = true;
+    try { renderChips(r, await actions.suggestFollowUps(), actions); }
+    finally { r.suggestBtn.disabled = false; }
+  });
 
   refs = r;
   return r;
+}
+
+// Render clickable follow-up chips; clicking one asks it (like a typed question) and clears the row.
+function renderChips(r: NotchRefs, ideas: string[], actions: NotchActions): void {
+  r.chipsEl.replaceChildren();
+  for (const text of ideas) {
+    const chip = document.createElement("button");
+    chip.className = "notch-chip";
+    chip.type = "button";
+    chip.textContent = text;
+    chip.title = text;
+    chip.addEventListener("click", async () => {
+      r.chipsEl.replaceChildren();
+      await actions.send(text);
+    });
+    r.chipsEl.appendChild(chip);
+  }
+}
+
+// Collapse/expand toggle icon reflects state: chevron-up = minimize (when expanded),
+// chevron-down = expand (when collapsed).
+export function setCollapseIcon(r: NotchRefs, expanded: boolean): void {
+  setIcon(r.collapseBtn, expanded ? ChevronUp : ChevronDown);
+  r.collapseBtn.title = expanded ? "Minimize" : "Expand";
 }
 
 export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void {
@@ -123,5 +185,8 @@ export function renderNotch(root: HTMLElement, state: NotchState, actions: Notch
   r.countEl.textContent = page.total ? `${page.index + 1} / ${page.total}` : "";
   r.prev.disabled = !page.hasPrev;
   r.next.disabled = !page.hasNext;
+  const hasAssistant = state.turns.some((t) => t.role === "assistant");
+  r.regenBtn.disabled = !hasAssistant;
+  r.suggestBtn.disabled = !hasAssistant;
   if (r.opacitySlider.value !== String(state.opacity)) r.opacitySlider.value = String(state.opacity);
 }

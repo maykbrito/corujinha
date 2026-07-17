@@ -1,5 +1,5 @@
-export interface ConfigData { ollamaUrl: string; model: string; }
-export const DEFAULT_CONFIG: ConfigData = { ollamaUrl: "http://localhost:11434", model: "gemma4:26b" };
+export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; }
+export const DEFAULT_CONFIG: ConfigData = { ollamaUrl: "http://localhost:11434", model: "gemma4:26b", hideFromCapture: true };
 
 export interface ConfigDisk { read(): string | null; write(s: string): void; }
 

@@ -57,7 +57,10 @@ html, body {
 .notch-shape.dragging, .notch-shape.resizing { transition: none !important; }
 .notch-shape.near-snap { box-shadow: 0 0 16px 2px rgba(255, 255, 255, 0.15); }
 
-/* ===== Header (always visible, 34px; the drag handle) ===== */
+/* ===== Header (always visible, 34px; the drag handle) =====
+ * NOTE: no -webkit-app-region here. The window is movable:false and dragging is driven by
+ * JS+IPC; an app-region:drag would let macOS swallow the header's mousedown/click, which
+ * breaks both dragging and click-to-expand. */
 .notch-header {
   position: relative;
   flex: 0 0 34px;
@@ -66,8 +69,20 @@ html, body {
   align-items: center;
   justify-content: space-between;
   padding: 0 14px;
-  -webkit-app-region: drag; /* fallback; JS drag drives the actual move */
+  gap: 6px;
+  cursor: grab;
 }
+.notch-shape.dragging .notch-header { cursor: grabbing; }
+
+/* Drag affordance: an always-visible grip icon at the header's left edge */
+.notch-grip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.35);
+}
+.notch-grip svg { width: 15px; height: 15px; }
+.notch-shape.hovering .notch-grip { color: rgba(255, 255, 255, 0.6); }
 
 .notch-status {
   font-size: 11px;
@@ -108,6 +123,7 @@ html, body {
   -webkit-app-region: no-drag;
 }
 .notch-hbtn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+.notch-hbtn svg { width: 13px; height: 13px; }
 
 /* ===== Inner content (fades in when expanded) ===== */
 .notch-inner {
@@ -152,6 +168,25 @@ html, body {
 /* Typebox */
 .notch-typebox { flex: 0 0 auto; display: flex; gap: 6px; }
 .notch-typebox input { flex: 1; background: rgba(255, 255, 255, 0.06); color: #eee; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+
+/* Regenerate / follow-ups */
+.notch-followups { flex: 0 0 auto; display: flex; flex-direction: column; gap: 6px; }
+.notch-followup-actions { display: flex; gap: 6px; }
+.notch-textbtn { display: inline-flex; align-items: center; gap: 4px; }
+.notch-textbtn svg { width: 12px; height: 12px; }
+.notch-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.notch-chips:empty { display: none; }
+.notch-chip {
+  max-width: 100%;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(108, 204, 255, 0.12);
+  border-color: rgba(108, 204, 255, 0.3);
+  color: #cfe9ff;
+}
+.notch-chip:hover { background: rgba(108, 204, 255, 0.22); }
 
 button {
   background: rgba(255, 255, 255, 0.1);

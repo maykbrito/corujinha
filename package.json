@@ -27,6 +27,7 @@
     "vitest": "^4.1.10"
   },
   "dependencies": {
-    "better-sqlite3": "^12.11.1"
+    "better-sqlite3": "^12.11.1",
+    "lucide": "^1.25.0"
   }
 }

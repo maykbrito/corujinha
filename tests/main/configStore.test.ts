@@ -11,10 +11,19 @@ describe("ConfigStore", () => {
     const cs = new ConfigStore(fakeDisk());
     expect(cs.get()).toEqual(DEFAULT_CONFIG);
   });
+  it("defaults hideFromCapture on (content protection by default)", () => {
+    const cs = new ConfigStore(fakeDisk());
+    expect(cs.get().hideFromCapture).toBe(true);
+  });
+  it("merges a legacy file lacking hideFromCapture over the default", () => {
+    const cs = new ConfigStore(fakeDisk(JSON.stringify({ model: "llava:13b" })));
+    expect(cs.get().hideFromCapture).toBe(true); // filled from DEFAULT_CONFIG
+    expect(cs.get().model).toBe("llava:13b");
+  });
   it("round-trips a partial set (merged over current)", () => {
     const cs = new ConfigStore(fakeDisk());
     const next = cs.set({ model: "llava:13b" });
-    expect(next).toEqual({ ollamaUrl: DEFAULT_CONFIG.ollamaUrl, model: "llava:13b" });
+    expect(next).toEqual({ ...DEFAULT_CONFIG, model: "llava:13b" });
     expect(cs.get()).toEqual(next);
   });
   it("falls back to defaults on a malformed file", () => {

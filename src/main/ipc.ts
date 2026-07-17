@@ -17,8 +17,19 @@ export function registerIpc(deps: {
 }): void {
   const config = makeElectronConfigStore();
 
+  // Hide the notch from screen capture/recording (content protection) per config.
+  const applyContentProtection = () => {
+    const notch = deps.getNotch();
+    if (notch && !notch.isDestroyed()) notch.setContentProtection(config.get().hideFromCapture);
+  };
+  applyContentProtection(); // startup: honor the persisted setting
+
   ipcMain.handle(IPC.CONFIG_GET, () => config.get());
-  ipcMain.handle(IPC.CONFIG_SET, (_e, partial) => config.set(partial));
+  ipcMain.handle(IPC.CONFIG_SET, (_e, partial) => {
+    const next = config.set(partial);
+    applyContentProtection();
+    return next;
+  });
   ipcMain.handle(IPC.OLLAMA_CHAT, (_e, messages: ChatMessage[]) => ollamaChat(fetch, config.get(), messages));
 
   ipcMain.handle(IPC.CAPTURE_SCREEN, () => deps.capturer.capture());

@@ -9,5 +9,5 @@ export interface Capture { id: number; sessionId: number; turnId: number | null;
 
 export interface SearchHit { turnId: number | null; captureId: number | null; sessionId: number; snippet: string; createdAt: number; }
 
-export interface ConfigData { ollamaUrl: string; model: string; }
+export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; }
 export interface PermissionStatus { screen: "granted" | "denied" | "not-determined"; }
