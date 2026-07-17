@@ -81,7 +81,6 @@ const actions: NotchActions = {
   next() { index = Math.min(turns.length - 1, index + 1); render(); },
   openDashboard() { api.invoke("window:openDashboard"); },
   setOpacity(v) { opacity = clampOpacity(v); applyOpacity(); localStorage.setItem("notchOpacity", String(opacity)); },
-  toggleCollapsed() { morph === "collapsed" ? expand() : collapse(); },
 };
 
 // ---- build + wire chrome ----

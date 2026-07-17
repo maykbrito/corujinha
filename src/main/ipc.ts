@@ -42,6 +42,7 @@ export function registerIpc(deps: {
     const notch = deps.getNotch();
     if (!notch) return;
     notch.show();
+    notch.setIgnoreMouseEvents(true, { forward: true }); // reset to click-through; hover re-enables
     notch.webContents.send(IPC_EVENT.NOTCH_CONTINUE_SESSION, id);
   });
 

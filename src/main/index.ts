@@ -46,7 +46,7 @@ app.whenReady().then(() => {
     toggleNotch: () => {
       if (!notch) return;
       if (notch.isVisible()) notch.hide();
-      else notch.show();
+      else { notch.show(); notch.setIgnoreMouseEvents(true, { forward: true }); } // reset to click-through; hover re-enables
     },
   });
 });

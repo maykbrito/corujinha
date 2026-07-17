@@ -14,14 +14,17 @@ export function registerNotchWindowControl(getNotch: () => BrowserWindow | null)
     return { x: b.x, y: b.y };
   };
 
-  ipcMain.on(IPC.NOTCH_MOVE, (_e, x: number, y: number) => {
+  // NOTE: the preload only exposes `invoke`, so EVERY channel the renderer calls must be
+  // `ipcMain.handle` (invoke↔handle). Using `ipcMain.on` here would silently never fire and
+  // leave the window permanently click-through / undraggable.
+  ipcMain.handle(IPC.NOTCH_MOVE, (_e, x: number, y: number) => {
     const win = getNotch();
     if (win && !win.isDestroyed() && Number.isFinite(x) && Number.isFinite(y)) {
       win.setPosition(Math.round(x), Math.round(y));
     }
   });
 
-  ipcMain.on(IPC.NOTCH_RESIZE, (_e, width: number, height: number) => {
+  ipcMain.handle(IPC.NOTCH_RESIZE, (_e, width: number, height: number) => {
     const win = getNotch();
     if (!win || win.isDestroyed()) return;
     const size = clampSize({ width, height });
@@ -43,9 +46,9 @@ export function registerNotchWindowControl(getNotch: () => BrowserWindow | null)
 
   ipcMain.handle(IPC.NOTCH_GET_NOTCH_POSITION, () => notchOrigin());
 
-  ipcMain.on(IPC.NOTCH_SET_PINNED, (_e, p: boolean) => { pinned = !!p; });
+  ipcMain.handle(IPC.NOTCH_SET_PINNED, (_e, p: boolean) => { pinned = !!p; });
 
-  ipcMain.on(IPC.NOTCH_SET_IGNORE_MOUSE, (_e, ignore: boolean, options?: { forward?: boolean }) => {
+  ipcMain.handle(IPC.NOTCH_SET_IGNORE_MOUSE, (_e, ignore: boolean, options?: { forward?: boolean }) => {
     const win = getNotch();
     if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(!!ignore, options || {});
   });

@@ -22,7 +22,6 @@ export interface NotchActions {
   next(): void;
   openDashboard(): void;
   setOpacity(v: number): void;
-  toggleCollapsed(): void;
 }
 
 export interface NotchRefs {
