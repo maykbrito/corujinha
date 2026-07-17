@@ -1,133 +1,186 @@
-/* src/renderer/notch/styles.css */
-html,
-body {
-  margin: 0;
+/* src/renderer/notch/styles.css
+ * Cody-style morphing notch: a 300x34 pill that morphs into a panel filling the window.
+ * The OS window IS the panel size (main resizes it on edge-drag), so the expanded shape is
+ * simply 100% of the window — no content-height measurement needed. */
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
   height: 100%;
   background: transparent;
-  color: #eee;
-  font: 12px -apple-system, system-ui;
+  overflow: hidden;
+  font: 12px -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
 }
 
-/* Whole panel is draggable (drag from anywhere). Interactive/scrollable bits opt out
-   with .nodrag so you can still scroll the response, click buttons, and type. */
-#panel {
-  box-sizing: border-box;
-  height: 100vh;
-  background: #000;
-  border-radius: 0 0 20px 20px;
-  padding: 10px 16px 12px;
+/* ===== The morphing shape ===== */
+.notch-shape {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  --notch-bg-opacity: 1;
+  background: rgba(0, 0, 0, var(--notch-bg-opacity));
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  -webkit-app-region: drag;
+
+  /* Collapsed = pill */
+  width: 300px;
+  height: 34px;
+  border-radius: 0 0 24px 24px;
+
+  transition:
+    width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    height 0.5s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-radius 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.16s ease;
 }
 
-.nodrag {
-  -webkit-app-region: no-drag;
-}
+/* Expanded = fill the window (which main sizes to the panel) */
+.notch-shape.expanded { width: 100%; height: 100%; border-radius: 0 0 20px 20px; }
 
-.row {
+/* Floating (user dragged away from the notch origin): round all corners */
+.notch-shape.floating { border-radius: 24px; }
+.notch-shape.floating.expanded { border-radius: 20px; }
+
+/* Collapse uses an ease-out (no bounce); drag/resize disable transitions for instant feedback */
+.notch-shape.collapsing {
+  transition:
+    width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    border-radius 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.notch-shape.dragging, .notch-shape.resizing { transition: none !important; }
+.notch-shape.near-snap { box-shadow: 0 0 16px 2px rgba(255, 255, 255, 0.15); }
+
+/* ===== Header (always visible, 34px; the drag handle) ===== */
+.notch-header {
+  position: relative;
+  flex: 0 0 34px;
+  height: 34px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-
-.top {
   justify-content: space-between;
+  padding: 0 14px;
+  -webkit-app-region: drag; /* fallback; JS drag drives the actual move */
 }
 
-.top-actions {
-  display: flex;
-  gap: 10px;
-}
-
-.status {
+.notch-status {
+  font-size: 11px;
   color: #6cf;
-  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: 70%;
 }
 
-.link {
-  color: #9ab;
-  text-decoration: none;
-  font-size: 11px;
+.notch-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease;
+  -webkit-app-region: no-drag;
 }
+/* Hover-reveal the controls (also while dragging/resizing so they don't flicker) */
+.notch-shape.hovering .notch-header-actions,
+.notch-shape.dragging .notch-header-actions,
+.notch-shape.resizing .notch-header-actions { opacity: 1; pointer-events: auto; }
 
-/* The turn area grows with the window; the response text scrolls inside it. */
-.turn {
+.notch-hbtn {
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+.notch-hbtn:hover { background: rgba(255, 255, 255, 0.16); color: #fff; }
+
+/* ===== Inner content (fades in when expanded) ===== */
+.notch-inner {
   flex: 1 1 auto;
-  min-height: 40px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  padding: 4px 14px 12px;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.3s ease 0.2s, transform 0.3s ease 0.2s;
+  -webkit-app-region: no-drag;
 }
+.notch-shape.expanded .notch-inner { opacity: 1; transform: translateY(0); }
+.notch-shape.collapsing .notch-inner { opacity: 0; transform: translateY(-6px); transition: opacity 0.12s ease, transform 0.12s ease; }
 
-.role {
-  display: block;
-  color: #888;
-  text-transform: uppercase;
-  font-size: 9px;
-  letter-spacing: 0.5px;
-  flex: 0 0 auto;
-}
+/* Content view vs settings view */
+.notch-content-view { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.notch-settings-view { display: none; flex-direction: column; gap: 10px; padding: 6px 0; }
+.notch-shape.show-settings .notch-content-view { display: none; }
+.notch-shape.show-settings .notch-settings-view { display: flex; }
 
-.text {
-  flex: 1 1 auto;
-  line-height: 1.4;
-  overflow-y: auto;
-  padding-right: 4px;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
+.notch-turn { flex: 1 1 auto; min-height: 40px; display: flex; flex-direction: column; overflow: hidden; }
+.notch-role { display: block; color: #888; text-transform: uppercase; font-size: 9px; letter-spacing: 0.5px; flex: 0 0 auto; margin-bottom: 2px; }
+.notch-content { flex: 1 1 auto; overflow-y: auto; line-height: 1.45; padding-right: 4px; word-break: break-word; }
+.notch-content::-webkit-scrollbar { width: 4px; }
+.notch-content::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 2px; }
+.notch-content p { margin: 4px 0; }
+.notch-content ul, .notch-content ol { margin: 4px 0; padding-left: 18px; }
+.notch-content li { margin: 2px 0; }
+.notch-content strong { color: #fff; font-weight: 600; }
+.notch-content code { background: rgba(255, 255, 255, 0.1); border-radius: 3px; padding: 1px 4px; font: 11px 'SF Mono', Menlo, monospace; }
+.notch-content pre { background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 6px; padding: 8px 10px; margin: 6px 0; overflow-x: auto; }
+.notch-content pre code { background: none; padding: 0; font-size: 11px; white-space: pre; }
+.notch-content h1, .notch-content h2, .notch-content h3 { color: #fff; margin: 6px 0 4px; font-size: 13px; font-weight: 600; }
+.notch-content blockquote { border-left: 2px solid rgba(255, 255, 255, 0.2); padding-left: 10px; margin: 4px 0; color: rgba(255, 255, 255, 0.6); }
 
-.nav {
-  justify-content: center;
-}
+/* Nav (pagination) */
+.notch-nav { flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.notch-nav .count { color: #888; min-width: 48px; text-align: center; }
 
-.count {
-  color: #888;
-  min-width: 48px;
-  text-align: center;
-}
-
-.controls {
-  flex-wrap: wrap;
-}
+/* Typebox */
+.notch-typebox { flex: 0 0 auto; display: flex; gap: 6px; }
+.notch-typebox input { flex: 1; background: rgba(255, 255, 255, 0.06); color: #eee; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
 
 button {
-  background: #222;
+  background: rgba(255, 255, 255, 0.1);
   color: #eee;
-  border: 1px solid #333;
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   padding: 4px 8px;
   cursor: pointer;
   font-size: 11px;
 }
+button.primary { background: #2a6; border-color: #2a6; color: #fff; }
+button:disabled { opacity: 0.4; cursor: default; }
 
-button.primary {
-  background: #2a6;
-  border-color: #2a6;
-}
+/* Settings: opacity slider */
+.notch-settings-view label { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.notch-opacity { -webkit-appearance: none; width: 100%; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.2); outline: none; }
+.notch-opacity::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #2a6; border: 2px solid rgba(255, 255, 255, 0.3); cursor: pointer; }
 
-button:disabled {
-  opacity: 0.4;
-  cursor: default;
+/* ===== Resize handles (bottom-right/right/bottom edges) ===== */
+.notch-resize-handle {
+  position: absolute;
+  z-index: 30;
+  opacity: 0;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
 }
-
-.typebox {
-  flex: 0 0 auto;
-}
-
-.typebox input {
-  flex: 1;
-  background: #111;
-  color: #eee;
-  border: 1px solid #333;
-  border-radius: 8px;
-  padding: 5px 8px;
-  font-size: 12px;
-}
-
-.typebox input:disabled {
-  opacity: 0.4;
-}
+.notch-shape.expanded.hovering .notch-resize-handle,
+.notch-shape.expanded.resizing .notch-resize-handle { opacity: 1; pointer-events: auto; }
+.notch-resize-handle.right { top: 44px; right: 0; bottom: 16px; width: 10px; cursor: ew-resize; }
+.notch-resize-handle.bottom { left: 44px; right: 44px; bottom: 0; height: 10px; cursor: ns-resize; }
+.notch-resize-handle.right::after { content: ''; position: absolute; top: 50%; right: 3px; width: 2px; height: 36px; border-radius: 999px; background: rgba(255, 255, 255, 0.15); transform: translateY(-50%); }
+.notch-resize-handle.bottom::after { content: ''; position: absolute; left: 50%; bottom: 3px; width: 40px; height: 2px; border-radius: 999px; background: rgba(255, 255, 255, 0.15); transform: translateX(-50%); }

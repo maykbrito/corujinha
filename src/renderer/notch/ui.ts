@@ -1,86 +1,128 @@
 // src/renderer/notch/ui.ts
 //
-// Notch UI: text field + Send + response display + prev/next pagination. Builds the DOM
-// shell once (so the input keeps focus/value across re-renders) and updates dynamic parts
-// on every render. The current turn is chosen by the tested `pageFor`.
+// Builds the Cody-style morphing notch shape once and returns the DOM refs the controller
+// (main.ts) attaches morph/drag/resize/opacity/click-through listeners to. renderNotch
+// updates the dynamic parts (status, current turn as markdown, pagination, opacity value).
 import { pageFor } from "@shared/session/pagination";
+import { renderMarkdown } from "@shared/notchMarkdown";
 import type { Turn } from "@shared/types";
 
 export interface NotchState {
   turns: Turn[];
   index: number;
-  statusLabel: string; // "thinking…" | "" | "error: …" | "screen capture failed — text only"
+  statusLabel: string;
+  opacity: number; // 0.45..1, drives --notch-bg-opacity
 }
+
 export interface NotchActions {
-  send(text: string): Promise<boolean>; // resolves true if the turn succeeded (clears the field)
+  send(text: string): Promise<boolean>; // clears input only on true (spec §7)
   askNow(): void;
   newSession(): void;
   prev(): void;
   next(): void;
   openDashboard(): void;
+  setOpacity(v: number): void;
+  toggleCollapsed(): void;
 }
-interface Refs {
-  statusEl: HTMLElement; roleEl: HTMLElement; textEl: HTMLElement; countEl: HTMLElement;
-  prev: HTMLButtonElement; next: HTMLButtonElement; send: HTMLButtonElement; input: HTMLInputElement;
-}
-const cache = new WeakMap<HTMLElement, Refs>();
 
-function build(root: HTMLElement, actions: NotchActions): Refs {
+export interface NotchRefs {
+  shape: HTMLElement;
+  header: HTMLElement;
+  newBtn: HTMLElement;
+  gearBtn: HTMLElement;
+  collapseBtn: HTMLElement;
+  resizeRight: HTMLElement;
+  resizeBottom: HTMLElement;
+  input: HTMLInputElement;
+  opacitySlider: HTMLInputElement;
+  statusEl: HTMLElement;
+  roleEl: HTMLElement;
+  contentEl: HTMLElement;
+  countEl: HTMLElement;
+  prev: HTMLButtonElement;
+  next: HTMLButtonElement;
+  send: HTMLButtonElement;
+}
+
+let refs: NotchRefs | null = null;
+
+export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs {
   root.innerHTML = `
-    <div id="panel">
-      <div class="row top">
-        <span id="status" class="status"></span>
-        <span class="top-actions">
-          <a id="new" class="link nodrag" href="#">new</a>
-          <a id="dash" class="link nodrag" href="#">dashboard</a>
-        </span>
+    <div class="notch-shape" id="shape">
+      <div class="notch-header" id="header">
+        <span class="notch-status" id="status"></span>
+        <div class="notch-header-actions">
+          <button class="notch-hbtn" id="new" title="New session">+</button>
+          <button class="notch-hbtn" id="dash" title="Dashboard">☰</button>
+          <button class="notch-hbtn" id="gear" title="Opacity">◐</button>
+          <button class="notch-hbtn" id="collapse" title="Collapse">▲</button>
+        </div>
       </div>
-      <div class="turn">
-        <span id="role" class="role"></span>
-        <div id="text" class="text nodrag"></div>
+      <div class="notch-inner">
+        <div class="notch-content-view">
+          <div class="notch-turn">
+            <span class="notch-role" id="role"></span>
+            <div class="notch-content" id="content"></div>
+          </div>
+          <div class="notch-nav">
+            <button id="prev">‹</button>
+            <span class="count" id="count"></span>
+            <button id="next">›</button>
+          </div>
+          <div class="notch-typebox">
+            <input id="msg" type="text" placeholder="Ask about your screen…" />
+            <button id="send" class="primary">Send</button>
+          </div>
+        </div>
+        <div class="notch-settings-view">
+          <label>Opacity</label>
+          <input type="range" id="opacity" class="notch-opacity" min="0.45" max="1" step="0.05" />
+        </div>
       </div>
-      <div class="row nav">
-        <button id="prev" class="nodrag">‹</button>
-        <span id="count" class="count"></span>
-        <button id="next" class="nodrag">›</button>
-      </div>
-      <div class="row typebox">
-        <input id="msg" class="nodrag" type="text" placeholder="Ask about your screen…" />
-        <button id="send" class="nodrag primary">Send</button>
-      </div>
+      <div class="notch-resize-handle right" id="resizeRight"></div>
+      <div class="notch-resize-handle bottom" id="resizeBottom"></div>
     </div>`;
+
   const $ = <T extends HTMLElement>(id: string) => root.querySelector<T>(`#${id}`)!;
-  const refs: Refs = {
-    statusEl: $("status"), roleEl: $("role"), textEl: $("text"), countEl: $("count"),
-    prev: $<HTMLButtonElement>("prev"), next: $<HTMLButtonElement>("next"),
-    send: $<HTMLButtonElement>("send"), input: $<HTMLInputElement>("msg"),
+  const r: NotchRefs = {
+    shape: $("shape"), header: $("header"),
+    newBtn: $("new"), gearBtn: $("gear"), collapseBtn: $("collapse"),
+    resizeRight: $("resizeRight"), resizeBottom: $("resizeBottom"),
+    input: $<HTMLInputElement>("msg"), opacitySlider: $<HTMLInputElement>("opacity"),
+    statusEl: $("status"), roleEl: $("role"), contentEl: $("content"), countEl: $("count"),
+    prev: $<HTMLButtonElement>("prev"), next: $<HTMLButtonElement>("next"), send: $<HTMLButtonElement>("send"),
   };
+
   const submit = async () => {
-    const v = refs.input.value.trim();
+    const v = r.input.value.trim();
     if (!v) return;
-    refs.send.disabled = true;
+    r.send.disabled = true;
     const ok = await actions.send(v);
-    refs.send.disabled = false;
-    if (ok) refs.input.value = ""; // keep the text on failure so the user can retry (spec §7)
-    else refs.input.focus();
+    r.send.disabled = false;
+    if (ok) r.input.value = ""; // keep the text on failure so the user can retry (spec §7)
+    else r.input.focus();
   };
-  refs.prev.addEventListener("click", actions.prev);
-  refs.next.addEventListener("click", actions.next);
-  refs.send.addEventListener("click", submit);
-  refs.input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
-  root.querySelector<HTMLElement>("#dash")!.addEventListener("click", (e) => { e.preventDefault(); actions.openDashboard(); });
-  root.querySelector<HTMLElement>("#new")!.addEventListener("click", (e) => { e.preventDefault(); actions.newSession(); });
-  cache.set(root, refs);
-  return refs;
+
+  r.send.addEventListener("click", submit);
+  r.input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+  r.prev.addEventListener("click", actions.prev);
+  r.next.addEventListener("click", actions.next);
+  r.newBtn.addEventListener("click", (e) => { e.stopPropagation(); actions.newSession(); });
+  root.querySelector<HTMLElement>("#dash")!.addEventListener("click", (e) => { e.stopPropagation(); actions.openDashboard(); });
+  r.opacitySlider.addEventListener("input", () => actions.setOpacity(parseFloat(r.opacitySlider.value)));
+
+  refs = r;
+  return r;
 }
 
 export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void {
-  const refs = cache.get(root) ?? build(root, actions);
+  const r = refs ?? buildNotch(root, actions);
   const page = pageFor(state.turns, state.index);
-  refs.statusEl.textContent = state.statusLabel;
-  refs.roleEl.textContent = page.item ? page.item.role : "";
-  refs.textEl.textContent = page.item ? page.item.text : "Ask about your screen to begin.";
-  refs.countEl.textContent = page.total ? `${page.index + 1} / ${page.total}` : "";
-  refs.prev.disabled = !page.hasPrev;
-  refs.next.disabled = !page.hasNext;
+  r.statusEl.textContent = state.statusLabel;
+  r.roleEl.textContent = page.item ? page.item.role : "";
+  r.contentEl.innerHTML = page.item ? renderMarkdown(page.item.text) : "<p>Ask about your screen to begin.</p>";
+  r.countEl.textContent = page.total ? `${page.index + 1} / ${page.total}` : "";
+  r.prev.disabled = !page.hasPrev;
+  r.next.disabled = !page.hasNext;
+  if (r.opacitySlider.value !== String(state.opacity)) r.opacitySlider.value = String(state.opacity);
 }
