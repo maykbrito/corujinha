@@ -6,6 +6,12 @@
 
 ---
 
+<div align="center">
+  <img src="assets/preview.webp" width="720" alt="Corujinha gerando um quiz a partir do que está na tela" />
+  <br />
+  <em>A Corujinha lê o que está na tela e monta um quiz sobre o conteúdo.</em>
+</div>
+
 ## O que é
 
 Corujinha é um app de macOS que vive numa pílula flutuante no topo da tela (estilo Dynamic Island). Você **mostra algo na tela e pergunta** — ele tira um print, manda pro seu modelo de IA rodando **localmente no Ollama** e responde no contexto do que está ali na sua frente.
