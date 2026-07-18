@@ -16,7 +16,7 @@ describe("HistoryStore", () => {
   beforeEach(() => { store = freshStore(); });
 
   it("creates a session and returns it as active", () => {
-    const s = store.startSession("gpt-realtime-2.1");
+    const s = store.startSession("m");
     expect(s.id).toBeGreaterThan(0);
     expect(s.status).toBe("active");
     expect(s.mode).toBe("converse");

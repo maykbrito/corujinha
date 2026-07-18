@@ -5,7 +5,7 @@
 //  - the morph state machine (pill <-> panel),
 //  - drag-with-snap, edge resize, opacity tint, and click-through toggling.
 import { buildNotch, renderNotch, setCollapseIcon, type NotchState, type NotchActions, type NotchRefs } from "./ui";
-import { startConverse, type Converse, type ConverseHooks } from "./realtime";
+import { startConverse, type Converse, type ConverseHooks } from "./converse";
 import { NOTCH, clampSize, clampOpacity, snapDistance } from "@shared/notchGeometry";
 import type { Turn } from "@shared/types";
 

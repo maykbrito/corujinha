@@ -1,6 +1,5 @@
-// src/renderer/notch/realtime.ts
+// src/renderer/notch/converse.ts
 // Local turn pipeline: capture screen + send text to Ollama, return assistant text.
-// No WebRTC, no live session — one request per Send.
 import type { Turn } from "@shared/types";
 import { parseFollowUps } from "@shared/followUps";
 const api = (window as any).api;
