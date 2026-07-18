@@ -1,7 +1,7 @@
 <div align="center">
   <img src="build/icon.png" width="128" alt="Corujinha" />
   <h1>Corujinha 🦉</h1>
-  <p><strong>Um companheiro de IA que mora num canto da sua tela, enxerga o que você está fazendo e te ajuda — local e privado.</strong></p>
+  <p><strong>Um companheiro de IA que mora num canto da sua tela, enxerga o que você está fazendo e te ajuda. Local e privado.</strong></p>
 </div>
 
 ---
@@ -35,11 +35,13 @@ Cada pergunta captura a tela na hora e envia (texto + imagem) para o Ollama via 
 
 - macOS (Apple Silicon)
 - [Ollama](https://ollama.com) rodando localmente
-- Um modelo **com visão** (ex.: `llama3.2-vision`, `qwen2.5vl`, `llava`)
+- **Gemma 4** — o modelo de visão que a Corujinha usa por padrão
 
 ```bash
-ollama pull llama3.2-vision
+ollama pull gemma4:26b
 ```
+
+Você pode trocar o modelo em Settings (qualquer modelo com visão do seu Ollama serve).
 
 ## Desenvolvimento
 
