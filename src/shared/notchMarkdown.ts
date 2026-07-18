@@ -1,7 +1,4 @@
-// Ported from Cody notch-bubble.html (renderMarkdown/renderInline/escapeHtml), stripped of
-// the code-language-label and green-span features. Renders a safe subset of markdown.
-
-function escapeHtml(s: string): string {
+export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

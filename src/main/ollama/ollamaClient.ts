@@ -1,6 +1,4 @@
-// OllamaConfig is intentionally a local 2-field shape (not imported from @shared/types)
-// so this task is self-contained — ConfigData is added later in Task 3.
-export interface OllamaConfig { ollamaUrl: string; model: string; }
+import type { ConfigData } from "@shared/types";
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   text: string;
@@ -17,7 +15,7 @@ function toContent(m: ChatMessage) {
 
 export async function ollamaChat(
   fetchImpl: typeof fetch,
-  cfg: OllamaConfig,
+  cfg: Pick<ConfigData, "ollamaUrl" | "model">,
   messages: ChatMessage[],
 ): Promise<string> {
   const url = `${cfg.ollamaUrl.replace(/\/$/, "")}/v1/chat/completions`;

@@ -1,5 +1,5 @@
-export interface ShortcutMap { scrollUp: string; scrollDown: string; prevPage: string; nextPage: string; }
-export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; opacity: number; shortcuts: ShortcutMap; }
+export type { ConfigData, ShortcutMap } from "@shared/types";
+import type { ConfigData } from "@shared/types";
 export const DEFAULT_CONFIG: ConfigData = {
   ollamaUrl: "http://localhost:11434",
   model: "gemma4:26b",

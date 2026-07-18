@@ -4,6 +4,8 @@
 // Clicking a session shows its full transcript AND the screenshots the AI saw (thumbnail +
 // summary). The search box filters via history:search (raw text — HistoryStore sanitizes).
 import type { SearchHit, Turn, Session, Capture } from "@shared/types";
+import { escapeHtml } from "@shared/notchMarkdown";
+
 
 const api = (window as any).api;
 
@@ -132,21 +134,5 @@ async function loadSession(sessionId: number) {
   }
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => {
-    switch (c) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      default:
-        return "&#39;";
-    }
-  });
-}
 
 refresh(); // show the session list on open
