@@ -1,7 +1,7 @@
 <div align="center">
   <img src="build/icon.png" width="128" alt="Corujinha" />
-  <h1>Corujinha 🦉</h1>
-  <p><strong>Um companheiro de IA que mora num canto da sua tela, enxerga o que você está fazendo e te ajuda. Local e privado.</strong></p>
+  <h1>Corujinha</h1>
+  <p><strong>Um companheiro de IA que mora num canto da sua tela, enxerga o que você está fazendo e te ajuda. <br/> Local, privado e gratuito.</strong></p>
 </div>
 
 ---
@@ -9,19 +9,19 @@
 <div align="center">
   <img src="assets/preview.webp" width="720" alt="Corujinha gerando um quiz a partir do que está na tela" />
   <br />
-  <em>A Corujinha lê o que está na tela e monta um quiz sobre o conteúdo.</em>
+  <em>Ex.: A Corujinha lê o que está na tela e monta um quiz sobre o conteúdo.</em>
 </div>
 
 ## O que é
 
-Corujinha é um app de macOS que vive numa pílula flutuante no topo da tela (estilo Dynamic Island). Você **mostra algo na tela e pergunta** — ele tira um print, manda pro seu modelo de IA rodando **localmente no Ollama** e responde no contexto do que está ali na sua frente.
+Corujinha é um app de macOS que vive numa pílula flutuante no topo da tela (estilo Dynamic Island). Você **mostra algo na tela e pergunta**, ele tira um print, manda pro seu modelo de IA rodando **localmente no Ollama** e responde no contexto do que está ali na sua frente.
 
-Nasceu pra estudo, mas serve como um assistente genérico do dia a dia: explicar, traduzir, resumir, criar quiz, guiar um passo a passo, escrever, dar ideias, montar um mapa mental — sempre olhando junto com você.
+Nasceu pra estudo, mas serve como um assistente genérico do dia a dia: explicar, traduzir, resumir, criar quiz, guiar um passo a passo, escrever, dar ideias, montar um mapa mental, sempre olhando junto com você.
 
 ## Como funciona
 
 ```
-você mostra a tela  →  pergunta na notch  →  Corujinha vê o print + responde
+você mostra a tela  →  pergunta  →  Corujinha vê o print + responde
 ```
 
 Cada pergunta captura a tela na hora e envia (texto + imagem) para o Ollama via API compatível com OpenAI (`/v1/chat/completions`). Nada sai da sua máquina.
@@ -73,9 +73,11 @@ Na primeira execução, conceda a permissão de **Gravação de Tela** em Ajuste
 
 Os quatro de navegação são editáveis em Settings → Shortcuts.
 
+Para fechar completamente, abre o Settings e usa o atalho `⌘Q`.
+
 ## Stack
 
-Electron · electron-vite · TypeScript · better-sqlite3 (SQLite + FTS5) · Lucide · Ollama
+Electron · electron-vite · TypeScript · HTML · CSS · better-sqlite3 (SQLite + FTS5) · Lucide · Ollama
 
 ## Licença
 
