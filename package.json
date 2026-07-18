@@ -1,7 +1,7 @@
 {
   "name": "corujinha",
   "version": "1.0.0",
-  "description": "AI that see your screen and talk with you",
+  "description": "AI companion that lives in a corner of your screen, sees what you're doing and helps — local and private",
   "main": "out/main/index.js",
   "license": "MIT",
   "scripts": {
