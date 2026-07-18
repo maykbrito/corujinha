@@ -1,5 +1,5 @@
 // src/main/index.ts
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import { join } from "path";
 import { IPC } from "@shared/ipcChannels";
 import { createNotchWindow } from "./windows/notchWindow";
@@ -26,14 +26,28 @@ let quitting = false; // true only once a "real" window authorizes a quit (see b
 app.setName("corujinha");
 
 app.whenReady().then(() => {
-  const db = openDatabase(join(app.getPath("userData"), "corujinha.db"));
-  history = new HistoryStore(db);
   const worker = createCaptureWorker();
   const capturer = new ScreenCapturer(worker);
+  // Create the companion window BEFORE anything that can fail. Otherwise a startup
+  // error below (e.g. the native DB module failing to load) aborts this callback
+  // before the window exists — leaving a running-but-invisible ghost process.
   notch = createNotchWindow();
   // "Companion" window: never closes by accident. cmd+w on the notch is a no-op;
   // it only actually closes once a quit has been authorized from a real window (below).
   notch.on("close", (e) => { if (!quitting) e.preventDefault(); });
+
+  // History is not vital to showing the notch. If the DB fails to open, tell the user
+  // plainly with a native dialog and keep running degraded, instead of vanishing.
+  try {
+    const db = openDatabase(join(app.getPath("userData"), "corujinha.db"));
+    history = new HistoryStore(db);
+  } catch (err) {
+    dialog.showErrorBox(
+      "Corujinha — database error",
+      "Couldn't open the local history database. The app will run, but sessions won't be saved.\n\n" +
+        String(err),
+    );
+  }
   registerIpc({ history, capturer, getNotch: () => notch });
   registerNotchWindowControl(() => notch);
 

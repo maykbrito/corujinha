@@ -9,7 +9,10 @@ on:
 jobs:
   check:
     name: typecheck + test
-    runs-on: ubuntu-latest
+    # macOS runner: the app is mac-only, and the tests run under Electron's own Node
+    # (ELECTRON_RUN_AS_NODE, ABI 148) — no headless-Linux GUI-lib setup needed.
+    # Free minutes for public repos.
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -18,9 +21,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Skip lifecycle scripts on install (avoids the Electron native rebuild in CI).
-      # better-sqlite3 is rebuilt for Node by the test's own "pretest" hook.
-      - run: npm ci --ignore-scripts
+      # Run lifecycle scripts: postinstall (electron-builder install-app-deps) downloads
+      # Electron and compiles better-sqlite3 for Electron's ABI (148) — the ABI the tests
+      # now use by running vitest via `ELECTRON_RUN_AS_NODE=1 electron`.
+      - run: npm ci
 
       - run: npm run typecheck
 

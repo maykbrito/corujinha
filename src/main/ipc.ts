@@ -11,7 +11,7 @@ import { ollamaChat, type ChatMessage } from "./ollama/ollamaClient";
 import { permissionStatus, openScreenRecordingSettings } from "./permissions";
 
 export function registerIpc(deps: {
-  history: HistoryStore;
+  history: HistoryStore | null;
   capturer: ScreenCapturer;
   getNotch: () => BrowserWindow | null;
 }): void {
@@ -42,15 +42,20 @@ export function registerIpc(deps: {
     deps.capturer.resolve(id, r),
   );
 
-  ipcMain.handle(IPC.HISTORY_START_SESSION, (_e, model: string) => deps.history.startSession(model));
-  ipcMain.handle(IPC.HISTORY_END_SESSION, (_e, id: number) => deps.history.endSession(id));
-  ipcMain.handle(IPC.HISTORY_ADD_TURN, (_e, t: Omit<Turn, "id" | "createdAt">) => deps.history.addTurn(t));
-  ipcMain.handle(IPC.HISTORY_ADD_CAPTURE, (_e, c: Omit<Capture, "id" | "createdAt">) => deps.history.addCapture(c));
-  ipcMain.handle(IPC.HISTORY_LIST_SESSIONS, () => deps.history.listSessions());
-  ipcMain.handle(IPC.HISTORY_LIST_TURNS, (_e, id: number) => deps.history.listTurns(id));
-  ipcMain.handle(IPC.HISTORY_LIST_CAPTURES, (_e, id: number) => deps.history.listCaptures(id));
-  ipcMain.handle(IPC.HISTORY_SEARCH, (_e, q: string) => deps.history.search(q));
-  ipcMain.handle(IPC.HISTORY_REOPEN_SESSION, (_e, id: number) => deps.history.reopenSession(id));
+  // History handlers only exist when the DB opened successfully (see index.ts). If it
+  // didn't, these stay unregistered and the renderer's invoke() rejects — degraded, not blank.
+  const h = deps.history;
+  if (h) {
+    ipcMain.handle(IPC.HISTORY_START_SESSION, (_e, model: string) => h.startSession(model));
+    ipcMain.handle(IPC.HISTORY_END_SESSION, (_e, id: number) => h.endSession(id));
+    ipcMain.handle(IPC.HISTORY_ADD_TURN, (_e, t: Omit<Turn, "id" | "createdAt">) => h.addTurn(t));
+    ipcMain.handle(IPC.HISTORY_ADD_CAPTURE, (_e, c: Omit<Capture, "id" | "createdAt">) => h.addCapture(c));
+    ipcMain.handle(IPC.HISTORY_LIST_SESSIONS, () => h.listSessions());
+    ipcMain.handle(IPC.HISTORY_LIST_TURNS, (_e, id: number) => h.listTurns(id));
+    ipcMain.handle(IPC.HISTORY_LIST_CAPTURES, (_e, id: number) => h.listCaptures(id));
+    ipcMain.handle(IPC.HISTORY_SEARCH, (_e, q: string) => h.search(q));
+    ipcMain.handle(IPC.HISTORY_REOPEN_SESSION, (_e, id: number) => h.reopenSession(id));
+  }
 
   // Continue a session from the Dashboard: reveal the notch and tell it to load + resume `id`.
   ipcMain.handle(IPC.SESSION_CONTINUE, (_e, id: number) => {
