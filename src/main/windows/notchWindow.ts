@@ -3,7 +3,7 @@ import { BrowserWindow, screen } from "electron";
 import { join } from "path";
 import { NOTCH, notchBounds } from "@shared/notchGeometry";
 
-// Cody-style: the OS window is sized to the expanded panel and stays put; the renderer
+// The OS window is sized to the expanded panel and stays put; the renderer
 // morphs the visible .notch-shape (pill <-> panel) with CSS inside it. The window is
 // click-through by default so the transparent area around the pill/panel forwards clicks;
 // the renderer disables click-through only while the pointer is inside the shape.

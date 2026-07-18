@@ -2,7 +2,7 @@
 //
 // Notch controller. Owns:
 //  - the turn pipeline (Phase A) + session management (New / Continue),
-//  - the Cody-style morph state machine (pill <-> panel),
+//  - the morph state machine (pill <-> panel),
 //  - drag-with-snap, edge resize, opacity tint, and click-through toggling.
 import { buildNotch, renderNotch, setCollapseIcon, type NotchState, type NotchActions, type NotchRefs } from "./ui";
 import { startConverse, type Converse, type ConverseHooks } from "./realtime";
@@ -20,7 +20,7 @@ let converse: Converse | null = null;
 let turnSeq = 0; // monotonic local id for rendered turns (not the DB rowid)
 
 // ---- notch chrome state ----
-type Morph = "collapsed" | "expanding" | "expanded" | "collapsing";
+type Morph = "collapsed" | "expanded" | "collapsing";
 let morph: Morph = "collapsed";
 let pinned = true;
 let opacity = 1; // 0.45..1; sourced from config, live-synced from Settings
@@ -92,9 +92,8 @@ function applyOpacity() { refs.shape.style.setProperty("--notch-bg-opacity", Str
 
 // ---- morph ----
 function expand() {
-  if (morph === "expanded" || morph === "expanding") return;
+  if (morph === "expanded") return;
   refs.shape.classList.remove("collapsing");
-  morph = "expanding";
   refs.shape.classList.add("expanded");
   morph = "expanded";
   setCollapseIcon(refs, true);

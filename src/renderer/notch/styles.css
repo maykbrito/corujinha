@@ -1,5 +1,5 @@
 /* src/renderer/notch/styles.css
- * Cody-style morphing notch: a 300x34 pill that morphs into a panel filling the window.
+ * Morphing notch: a 300x34 pill that morphs into a panel filling the window.
  * The OS window IS the panel size (main resizes it on edge-drag), so the expanded shape is
  * simply 100% of the window — no content-height measurement needed. */
 

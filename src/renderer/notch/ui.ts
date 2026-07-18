@@ -1,6 +1,6 @@
 // src/renderer/notch/ui.ts
 //
-// Builds the Cody-style morphing notch shape once and returns the DOM refs the controller
+// Builds the morphing notch shape once and returns the DOM refs the controller
 // (main.ts) attaches morph/drag/resize/opacity/click-through listeners to. renderNotch
 // updates the dynamic parts (status, current turn as markdown, pagination, opacity value).
 import { pageFor } from "@shared/session/pagination";

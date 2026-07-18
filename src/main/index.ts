@@ -19,19 +19,19 @@ let history: HistoryStore | null = null;
 let quitting = false; // true only once a "real" window authorizes a quit (see before-quit)
 
 // Use one stable app name for BOTH the dev build and the packaged .app, so they share a
-// single userData folder (~/Library/Application Support/see-and-talk). Without this, the
-// packaged app (productName "See-and-Talk") writes to a different folder than dev
-// ("see-and-talk"), making the key + history look "lost" when switching builds.
+// single userData folder (~/Library/Application Support/corujinha). Without this, the
+// packaged app (productName "Corujinha") writes to a different folder than dev
+// ("corujinha"), making the key + history look "lost" when switching builds.
 // Must run before app is ready (getPath("userData") is derived from the name).
-app.setName("see-and-talk");
+app.setName("corujinha");
 
 app.whenReady().then(() => {
-  const db = openDatabase(join(app.getPath("userData"), "see-and-talk.db"));
+  const db = openDatabase(join(app.getPath("userData"), "corujinha.db"));
   history = new HistoryStore(db);
   const worker = createCaptureWorker();
   const capturer = new ScreenCapturer(worker);
   notch = createNotchWindow();
-  // Cody-style "companion" window: never closes by accident. cmd+w on the notch is a no-op;
+  // "Companion" window: never closes by accident. cmd+w on the notch is a no-op;
   // it only actually closes once a quit has been authorized from a real window (below).
   notch.on("close", (e) => { if (!quitting) e.preventDefault(); });
   registerIpc({ history, capturer, getNotch: () => notch });
@@ -61,7 +61,7 @@ app.on("will-quit", () => {
   history?.endActiveSessions(); // close any active session synchronously before exit
 });
 
-// Cody model: cmd+q only quits when the Settings window is focused — never from the notch,
+// cmd+q only quits when the Settings window is focused — never from the notch,
 // Dashboard, or when nothing is focused. Forces a deliberate "open Settings, then quit".
 app.on("before-quit", (e) => {
   const focused = BrowserWindow.getFocusedWindow();
@@ -71,5 +71,5 @@ app.on("before-quit", (e) => {
 
 
 app.on("window-all-closed", () => {
-  /* keep running in tray on macOS */
+  /* keep running on macOS; the notch is a companion window, not a normal app */
 });

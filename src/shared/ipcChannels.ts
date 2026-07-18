@@ -21,7 +21,7 @@ export const IPC = {
   CAPTURE_THUMB: "capture:thumb", // read a stored thumbnail file -> data URL (dashboard)
   CAPTURE_OPEN: "capture:open", // open a stored screenshot in the default viewer
   CAPTURE_REVEAL: "capture:reveal", // reveal a stored screenshot in Finder
-  // notch window control (Cody-style morph/drag/resize)
+  // notch window control (morph/drag/resize)
   NOTCH_SET_FOCUSABLE: "notch:setFocusable",
   NOTCH_MOVE: "notch:move",
   NOTCH_RESIZE: "notch:resize",
