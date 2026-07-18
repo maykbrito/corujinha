@@ -21,7 +21,7 @@ Nasceu pra estudo, mas serve como um assistente genérico do dia a dia: explicar
 ## Como funciona
 
 ```
-você mostra a tela  →  pergunta  →  Corujinha vê o print + responde
+Você pergunta  →  Corujinha vê o print + responde
 ```
 
 Cada pergunta captura a tela na hora e envia (texto + imagem) para o Ollama via API compatível com OpenAI (`/v1/chat/completions`). Nada sai da sua máquina.
