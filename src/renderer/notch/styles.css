@@ -164,7 +164,7 @@ html, body {
 /* Typebox */
 .notch-typebox { flex: 0 0 auto; display: flex; gap: 6px; }
 .notch-typebox input { flex: 1; background: rgba(255, 255, 255, 0.06); color: #eee; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
-.notch-typebox button.primary { display: flex; align-items: center; justify-content: center; padding: 5px 12px; }
+.notch-typebox button.primary { display: flex; align-items: center; justify-content: center; width: 30px; padding: 0; border-radius: 8px; flex: 0 0 auto; }
 .notch-typebox button.primary svg { width: 15px; height: 15px; }
 
 /* Send-screen toggle: monitor icon; green "live" dot when on, dimmed when off. */
@@ -172,6 +172,7 @@ html, body {
 .notch-screen-toggle svg { width: 15px; height: 15px; }
 .notch-screen-toggle.on { color: #eee; }
 .notch-screen-toggle.on::after { content: ""; position: absolute; right: 5px; bottom: 5px; width: 6px; height: 6px; border-radius: 50%; background: #3ddc6d; box-shadow: 0 0 5px #3ddc6d; border: 1px solid #000; }
+.notch-screen-toggle[hidden] { display: none; } /* explicit: display:flex above would otherwise beat [hidden] */
 
 /* One-shot region attachment: a thumbnail that sits in the toggle's slot; click to remove. */
 .notch-attach { display: flex; align-items: center; flex: 0 0 auto; }
