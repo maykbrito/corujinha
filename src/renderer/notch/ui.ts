@@ -8,7 +8,7 @@ import { renderMarkdown } from "@shared/notchMarkdown";
 import type { Turn } from "@shared/types";
 import {
   createElement, GripHorizontal, Plus, LayoutGrid, Settings,
-  ChevronUp, ChevronDown, RefreshCw, Sparkles, SendHorizontal, Monitor, MonitorOff, X,
+  ChevronUp, ChevronDown, RefreshCw, Sparkles, SendHorizontal, Monitor, MonitorOff,
 } from "lucide";
 
 function setIcon(el: HTMLElement, node: Parameters<typeof createElement>[0]) {
@@ -215,20 +215,24 @@ export function setScreenToggle(r: NotchRefs, on: boolean): void {
   r.screenToggle.title = on ? "Sending screen — click for text only" : "Text only — click to send screen";
 }
 
-// One-shot region attachment chip: thumbnail + × to remove. Pass null to clear/hide.
+// One-shot region attachment: a thumbnail shown IN PLACE OF the send-screen toggle
+// (a region replaces the screen send — you can't send both). Click it to remove.
+// Pass null to clear and restore the toggle.
 export function renderAttach(r: NotchRefs, region: { dataUrl: string } | null, onRemove?: () => void): void {
-  if (!region) { r.attachEl.hidden = true; r.attachEl.replaceChildren(); return; }
+  if (!region) {
+    r.attachEl.hidden = true;
+    r.attachEl.replaceChildren();
+    r.screenToggle.hidden = false;
+    return;
+  }
   const thumb = document.createElement("img");
   thumb.className = "notch-attach-thumb";
   thumb.src = region.dataUrl;
-  const x = document.createElement("button");
-  x.className = "notch-attach-x";
-  x.type = "button";
-  x.title = "Remove";
-  x.appendChild(createElement(X));
-  x.addEventListener("click", (e) => { e.stopPropagation(); onRemove?.(); });
-  r.attachEl.replaceChildren(thumb, x);
+  thumb.title = "Region attached — click to remove";
+  thumb.addEventListener("click", (e) => { e.stopPropagation(); onRemove?.(); });
+  r.attachEl.replaceChildren(thumb);
   r.attachEl.hidden = false;
+  r.screenToggle.hidden = true;
 }
 
 export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void {

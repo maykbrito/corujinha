@@ -13,7 +13,7 @@ html, body {
 
 #sel {
   position: fixed;
-  border: 2px solid #6cccff;
+  border: 2px solid #3ddc6d;
   border-radius: 2px;
   /* clear inside + dim everything outside the selection */
   background: transparent;
@@ -25,8 +25,8 @@ html, body {
   position: absolute;
   top: -20px;
   left: 0;
-  background: #6cccff;
-  color: #00131f;
+  background: #3ddc6d;
+  color: #00190c;
   font-size: 10px;
   font-weight: 600;
   padding: 1px 6px;
