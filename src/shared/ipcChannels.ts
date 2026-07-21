@@ -18,6 +18,7 @@ export const IPC = {
   OLLAMA_CHAT: "ollama:chat",
   // capture
   CAPTURE_SCREEN: "capture:screen",
+  CAPTURE_REGION: "capture:region", // notch -> main: run selection overlay + return cropped image
   CAPTURE_THUMB: "capture:thumb", // read a stored thumbnail file -> data URL (dashboard)
   CAPTURE_OPEN: "capture:open", // open a stored screenshot in the default viewer
   CAPTURE_REVEAL: "capture:reveal", // reveal a stored screenshot in Finder
@@ -39,6 +40,7 @@ export const IPC = {
 // Main -> renderer broadcast events (not invoke handlers).
 export const IPC_EVENT = {
   HOTKEY_ASK_NOW: "hotkey:askNow",
+  HOTKEY_CAPTURE_REGION: "hotkey:captureRegion", // main -> notch: start region snip
   NOTCH_CONTINUE_SESSION: "notch:continueSession", // main -> notch: load + resume a session from history
   NOTCH_SET_OPACITY: "notch:setOpacity", // main -> notch: apply an opacity changed from Settings
   NOTCH_PAGE: "notch:page", // main -> notch: paginate turns ("prev" | "next")

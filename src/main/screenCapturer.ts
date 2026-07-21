@@ -22,7 +22,7 @@ export class ScreenCapturer {
     this.pending.delete(requestId);
   }
 
-  capture(): Promise<{ dataUrl: string; thumbPath: string }> {
+  capture(crop?: unknown): Promise<{ dataUrl: string; thumbPath: string }> {
     const id = randomUUID();
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); reject(new Error("capture timeout")); }, 5000);
@@ -36,7 +36,7 @@ export class ScreenCapturer {
         resolve({ dataUrl: r.dataUrl, thumbPath });
       });
       // Wait for the worker to have loaded so its "capture:do" listener exists.
-      this.ready.then(() => this.worker.webContents.send("capture:do", id));
+      this.ready.then(() => this.worker.webContents.send("capture:do", id, crop));
     });
   }
 }
