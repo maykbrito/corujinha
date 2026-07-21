@@ -9,6 +9,7 @@ import type { Turn, Capture } from "@shared/types";
 import { makeElectronConfigStore } from "./config/configStore";
 import { ollamaChat, type ChatMessage } from "./ollama/ollamaClient";
 import { permissionStatus, openScreenRecordingSettings } from "./permissions";
+import { captureRegionRect } from "./windows/selectionOverlay";
 
 export function registerIpc(deps: {
   history: HistoryStore | null;
@@ -37,6 +38,13 @@ export function registerIpc(deps: {
   ipcMain.handle(IPC.OLLAMA_CHAT, (_e, messages: ChatMessage[]) => ollamaChat(fetch, config.get(), messages));
 
   ipcMain.handle(IPC.CAPTURE_SCREEN, () => deps.capturer.capture());
+  // Region snip: run the selection overlay, then crop the capture to the chosen rect.
+  // Returns null when the user cancels (ESC / empty selection).
+  ipcMain.handle(IPC.CAPTURE_REGION, async () => {
+    const sel = await captureRegionRect();
+    if (!sel) return null;
+    return deps.capturer.capture(sel);
+  });
   // The capture worker reports each frame result back through this channel.
   ipcMain.handle("capture:result", (_e, id: string, r: { ok: boolean; dataUrl?: string; error?: string }) =>
     deps.capturer.resolve(id, r),
