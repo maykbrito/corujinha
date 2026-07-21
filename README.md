@@ -24,17 +24,19 @@ Nasceu pra estudo, mas serve como um assistente genérico do dia a dia: explicar
 Você pergunta  →  Corujinha vê o print + responde
 ```
 
-Cada pergunta captura a tela na hora e envia (texto + imagem) para o Ollama via API compatível com OpenAI (`/v1/chat/completions`). Nada sai da sua máquina.
+Por padrão, cada pergunta captura a tela na hora e envia (texto + imagem) para o Ollama via API compatível com OpenAI (`/v1/chat/completions`). Você pode **recortar só um pedaço** da tela (`⌘⇧2`) ou **desligar o envio do print** e perguntar só por texto. Nada sai da sua máquina.
 
 ## Recursos
 
 - 🦉 **Notch flutuante** — pílula que expande em painel; arrastar, redimensionar, ajustar opacidade, sempre no topo
 - 👁️ **Vê a sua tela** — captura contextual a cada pergunta, com visão do modelo
+- ✂️ **Recorte de área** (`⌘⇧2`) — selecione um pedaço da tela e envie só ele; ideal pra **texto pequeno**, que o modelo lê muito melhor num recorte do que na tela inteira
+- 🖥️ **Enviar tela on/off** — um toggle ao lado do campo de texto decide se cada pergunta anexa o print da tela ou vai só como texto
 - 🔒 **Local e privado** — roda 100% no seu Ollama; escondido de gravação/captura de tela (content protection)
 - 💬 **Q&A com histórico** — paginação de respostas, regenerar, sugestões de perguntas de continuidade
 - 🗂️ **Sessões** — comece uma nova ou continue uma conversa anterior
 - 🔎 **Dashboard** — lista e busca (full-text) todas as sessões, com o transcript e **os prints que a IA viu**
-- ⌨️ **Atalhos globais** — perguntar, mostrar/esconder, paginar e rolar a resposta — configuráveis
+- ⌨️ **Atalhos globais** — perguntar, recortar área, mostrar/esconder, paginar e rolar a resposta — configuráveis
 - ⚙️ **Configurável** — URL e modelo do Ollama, opacidade, atalhos, visibilidade em captura
 
 ## Requisitos
@@ -67,11 +69,12 @@ Na primeira execução, conceda a permissão de **Gravação de Tela** em Ajuste
 | Ação | Atalho |
 |------|--------|
 | Perguntar sobre a tela agora | `⌘⇧A` |
+| Recortar uma área da tela | `⌘⇧2` |
 | Mostrar / esconder a notch | `⌘⇧H` |
 | Resposta anterior / próxima | `⌘⇧←` / `⌘⇧→` |
 | Rolar a resposta | `⌘⇧↑` / `⌘⇧↓` |
 
-Os quatro de navegação são editáveis em Settings → Shortcuts.
+Os de navegação e o **recorte de área** são editáveis em Settings → Shortcuts.
 
 Para fechar completamente, abre o Settings e usa o atalho `⌘Q`.
 
