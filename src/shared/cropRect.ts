@@ -3,7 +3,7 @@
 // captured frame. The frame may be scaled differently from points (HiDPI, or the
 // captured video is not exactly display-native), so derive scale from frame/point ratio.
 export interface Rect { x: number; y: number; w: number; h: number; }
-export interface DisplayInfo { scaleFactor: number; pointW: number; pointH: number; }
+export interface DisplayInfo { pointW: number; pointH: number; }
 export interface FrameInfo { frameW: number; frameH: number; }
 
 export function toPixelCrop(sel: Rect, disp: DisplayInfo, frame: FrameInfo): Rect {

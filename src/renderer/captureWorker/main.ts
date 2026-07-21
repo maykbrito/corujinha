@@ -1,8 +1,8 @@
 // src/renderer/captureWorker/main.ts
-import { toPixelCrop, type Rect } from "@shared/cropRect";
+import { toPixelCrop, type Rect, type DisplayInfo } from "@shared/cropRect";
 const api = (window as any).api;
 
-interface CropReq { rect: Rect; disp: { scaleFactor: number; pointW: number; pointH: number }; }
+interface CropReq { rect: Rect; disp: DisplayInfo; }
 
 // maxWidth 1920 + quality 0.92: crisp enough for the model to read on-screen numbers/code.
 // JPEG (not WebP): Ollama/llama.cpp decodes images via stb_image, which supports JPEG/PNG but

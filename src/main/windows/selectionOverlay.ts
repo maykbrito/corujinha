@@ -5,7 +5,7 @@ import type { Rect } from "@shared/cropRect";
 
 export interface RegionSelection {
   rect: Rect;
-  disp: { scaleFactor: number; pointW: number; pointH: number };
+  disp: { pointW: number; pointH: number };
 }
 
 // Open a full-screen, transparent, click-capturing overlay for a one-shot region select.
@@ -47,7 +47,7 @@ export function captureRegionRect(): Promise<RegionSelection | null> {
       resolve(value);
     };
     ipcMain.handle("selection:done", (_e, rect: Rect) =>
-      finish({ rect, disp: { scaleFactor: d.scaleFactor, pointW: width, pointH: height } }),
+      finish({ rect, disp: { pointW: width, pointH: height } }),
     );
     ipcMain.handle("selection:cancel", () => finish(null));
     win.on("closed", () => finish(null)); // closed without a choice → cancel
