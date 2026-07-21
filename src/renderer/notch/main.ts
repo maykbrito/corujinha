@@ -4,7 +4,7 @@
 //  - the turn pipeline (Phase A) + session management (New / Continue),
 //  - the morph state machine (pill <-> panel),
 //  - drag-with-snap, edge resize, opacity tint, and click-through toggling.
-import { buildNotch, renderNotch, setCollapseIcon, type NotchState, type NotchActions, type NotchRefs } from "./ui";
+import { buildNotch, renderNotch, setCollapseIcon, setScreenToggle, renderAttach, type NotchState, type NotchActions, type NotchRefs } from "./ui";
 import { startConverse, type Converse, type ConverseHooks } from "./converse";
 import { NOTCH, clampSize, clampOpacity, snapDistance } from "@shared/notchGeometry";
 import type { Turn } from "@shared/types";
@@ -18,6 +18,10 @@ let index = 0;
 let statusLabel = "";
 let converse: Converse | null = null;
 let turnSeq = 0; // monotonic local id for rendered turns (not the DB rowid)
+
+// ---- attachment state ----
+let sendScreen = true; // toggle: send the full screen with each message (synced from config)
+let pendingRegion: { dataUrl: string; thumbPath: string } | null = null; // one-shot region crop
 
 // ---- notch chrome state ----
 type Morph = "collapsed" | "expanded" | "collapsing";
@@ -68,7 +72,11 @@ async function continueSession(id: number) {
 
 const actions: NotchActions = {
   async send(text) {
-    try { return await (await ensureConverse()).ask(text); }
+    try {
+      const ok = await (await ensureConverse()).ask(text, { sendScreen, region: pendingRegion });
+      if (ok) { pendingRegion = null; renderAttach(refs, null); }
+      return ok;
+    }
     catch { return false; }
   },
   async askNow() { (await ensureConverse()).askNow().catch(() => {}); },
@@ -89,6 +97,14 @@ const actions: NotchActions = {
 const refs = buildNotch(root, actions);
 
 function applyOpacity() { refs.shape.style.setProperty("--notch-bg-opacity", String(opacity)); }
+
+// Send-screen toggle: flip state, reflect the icon, persist to config.
+refs.screenToggle.addEventListener("click", (e) => {
+  e.stopPropagation();
+  sendScreen = !sendScreen;
+  setScreenToggle(refs, sendScreen);
+  api.invoke("config:set", { sendScreen });
+});
 
 // ---- morph ----
 function expand() {
@@ -230,6 +246,15 @@ document.addEventListener("mouseup", (e) => {
 
 // ---- global-shortcut + dashboard-continue relays ----
 api.on("hotkey:askNow", () => actions.askNow());
+// Region snip: run the overlay, then hold the crop as a one-shot attachment chip.
+api.on("hotkey:captureRegion", async () => {
+  const shot = await api.invoke("capture:region"); // { dataUrl, thumbPath } | null
+  if (!shot) return; // canceled
+  pendingRegion = shot;
+  if (morph === "collapsed") expand();
+  renderAttach(refs, { dataUrl: shot.dataUrl }, () => { pendingRegion = null; renderAttach(refs, null); });
+  refs.input.focus();
+});
 api.on("notch:continueSession", (id: number) => { void continueSession(id); });
 // Opacity is owned by config now; Settings edits it and main pushes changes here.
 api.on("notch:setOpacity", (v: number) => { opacity = clampOpacity(v); applyOpacity(); });
@@ -241,6 +266,9 @@ api.on("notch:scroll", (dir: string) => {
 });
 
 // ---- startup ----
-api.invoke("config:get").then((c: any) => { opacity = clampOpacity(c?.opacity ?? 1); applyOpacity(); });
+api.invoke("config:get").then((c: any) => {
+  opacity = clampOpacity(c?.opacity ?? 1); applyOpacity();
+  sendScreen = c?.sendScreen ?? true; setScreenToggle(refs, sendScreen);
+});
 api.invoke("notch:resize", size.width, size.height); // set the OS window to the persisted panel size
 render();

@@ -2,6 +2,7 @@
 // Local turn pipeline: capture screen + send text to Ollama, return assistant text.
 import type { Turn } from "@shared/types";
 import { parseFollowUps } from "@shared/followUps";
+import { decideCapture } from "@shared/decideCapture";
 const api = (window as any).api;
 
 const CONTEXT_TURNS = 10; // resend last N turns (text only) for continuity
@@ -34,18 +35,29 @@ export async function startConverse(hooks: ConverseHooks, opts: ConverseOptions 
     sessionId = (await api.invoke("history:startSession", cfg.model)).id;
   }
 
-  async function ask(text: string): Promise<boolean> {
+  async function ask(
+    text: string,
+    opts: { sendScreen: boolean; region?: { dataUrl: string; thumbPath: string } | null } = { sendScreen: true },
+  ): Promise<boolean> {
     const q = text.trim();
     if (!q) return false;
     hooks.onUserText(q);
     await api.invoke("history:addTurn", { sessionId, role: "user", source: "typed", text: q });
 
-    // Auto-capture; summary = the question text (inline), best-effort.
+    // Attach the region crop, the full screen, or nothing — per the toggle + one-shot region.
+    // summary = the question text (inline), best-effort.
     let imageDataUrl: string | undefined;
+    const mode = decideCapture({ hasRegion: !!opts.region, sendScreen: opts.sendScreen });
     try {
-      const shot = await api.invoke("capture:screen"); // { dataUrl, thumbPath }
-      await api.invoke("history:addCapture", { sessionId, turnId: null, thumbPath: shot.thumbPath, summary: q });
-      imageDataUrl = shot.dataUrl;
+      if (mode === "region" && opts.region) {
+        await api.invoke("history:addCapture", { sessionId, turnId: null, thumbPath: opts.region.thumbPath, summary: q });
+        imageDataUrl = opts.region.dataUrl;
+      } else if (mode === "full") {
+        const shot = await api.invoke("capture:screen"); // { dataUrl, thumbPath }
+        await api.invoke("history:addCapture", { sessionId, turnId: null, thumbPath: shot.thumbPath, summary: q });
+        imageDataUrl = shot.dataUrl;
+      }
+      // mode === "none" → text only
     } catch {
       hooks.onStatus("capture-failed"); // proceed text-only
     }
@@ -77,7 +89,7 @@ export async function startConverse(hooks: ConverseHooks, opts: ConverseOptions 
     getSessionId: () => sessionId,
     loadedTurns, // turns preloaded when continuing a session ([] for a fresh session)
     ask,
-    async askNow() { await ask("Describe what is currently on my screen."); },
+    async askNow() { await ask("Describe what is currently on my screen.", { sendScreen: true }); },
 
     // Re-answer the last question, keeping both answers (main pushes a new turn → paginated).
     // Text-only regen: no fresh screenshot, just a new pass over the existing context.

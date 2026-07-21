@@ -8,7 +8,7 @@ import { renderMarkdown } from "@shared/notchMarkdown";
 import type { Turn } from "@shared/types";
 import {
   createElement, GripHorizontal, Plus, LayoutGrid, Settings,
-  ChevronUp, ChevronDown, RefreshCw, Sparkles, SendHorizontal,
+  ChevronUp, ChevronDown, RefreshCw, Sparkles, SendHorizontal, Monitor, MonitorOff, X,
 } from "lucide";
 
 function setIcon(el: HTMLElement, node: Parameters<typeof createElement>[0]) {
@@ -80,6 +80,8 @@ export interface NotchRefs {
   regenBtn: HTMLButtonElement;
   suggestBtn: HTMLButtonElement;
   chipsEl: HTMLElement;
+  screenToggle: HTMLButtonElement;
+  attachEl: HTMLElement;
 }
 
 let refs: NotchRefs | null = null;
@@ -116,6 +118,8 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
             <div class="notch-chips" id="chips"></div>
           </div>
           <div class="notch-typebox">
+            <button id="screenToggle" class="notch-screen-toggle" title="Send screen"></button>
+            <div id="attach" class="notch-attach" hidden></div>
             <input id="msg" type="text" placeholder="Ask about your screen…" />
             <button id="send" class="primary" title="Send"></button>
           </div>
@@ -134,6 +138,7 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
     statusEl: $("status"), roleEl: $("role"), contentEl: $("content"), countEl: $("count"),
     prev: $<HTMLButtonElement>("prev"), next: $<HTMLButtonElement>("next"), send: $<HTMLButtonElement>("send"),
     regenBtn: $<HTMLButtonElement>("regen"), suggestBtn: $<HTMLButtonElement>("suggest"), chipsEl: $("chips"),
+    screenToggle: $<HTMLButtonElement>("screenToggle"), attachEl: $("attach"),
   };
 
   // Icons (Lucide). Tooltips come from each element's title attribute above.
@@ -145,10 +150,11 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
   r.regenBtn.replaceChildren(createElement(RefreshCw), Object.assign(document.createElement("span"), { textContent: "Regenerate" }));
   r.suggestBtn.replaceChildren(createElement(Sparkles), Object.assign(document.createElement("span"), { textContent: "Follow-ups" }));
   setIcon(r.send, SendHorizontal);
+  setScreenToggle(r, true); // default on; main.ts syncs from config at startup
 
   // Native tooltips don't render on a non-activating panel window, so drive our own from
   // each element's title attribute.
-  initTooltips([r.grip, r.newBtn, root.querySelector<HTMLElement>("#dash")!, r.settingsBtn, r.collapseBtn, r.send]);
+  initTooltips([r.grip, r.newBtn, root.querySelector<HTMLElement>("#dash")!, r.settingsBtn, r.collapseBtn, r.send, r.screenToggle]);
 
   const submit = async () => {
     const v = r.input.value.trim();
@@ -200,6 +206,29 @@ function renderChips(r: NotchRefs, ideas: string[], actions: NotchActions): void
 export function setCollapseIcon(r: NotchRefs, expanded: boolean): void {
   setIcon(r.collapseBtn, expanded ? ChevronUp : ChevronDown);
   r.collapseBtn.title = expanded ? "Minimize" : "Expand";
+}
+
+// Send-screen toggle: monitor icon (on) with a green "live" dot, or monitor-off (dimmed).
+export function setScreenToggle(r: NotchRefs, on: boolean): void {
+  setIcon(r.screenToggle, on ? Monitor : MonitorOff);
+  r.screenToggle.classList.toggle("on", on);
+  r.screenToggle.title = on ? "Sending screen — click for text only" : "Text only — click to send screen";
+}
+
+// One-shot region attachment chip: thumbnail + × to remove. Pass null to clear/hide.
+export function renderAttach(r: NotchRefs, region: { dataUrl: string } | null, onRemove?: () => void): void {
+  if (!region) { r.attachEl.hidden = true; r.attachEl.replaceChildren(); return; }
+  const thumb = document.createElement("img");
+  thumb.className = "notch-attach-thumb";
+  thumb.src = region.dataUrl;
+  const x = document.createElement("button");
+  x.className = "notch-attach-x";
+  x.type = "button";
+  x.title = "Remove";
+  x.appendChild(createElement(X));
+  x.addEventListener("click", (e) => { e.stopPropagation(); onRemove?.(); });
+  r.attachEl.replaceChildren(thumb, x);
+  r.attachEl.hidden = false;
 }
 
 export function renderNotch(root: HTMLElement, state: NotchState, actions: NotchActions): void {
