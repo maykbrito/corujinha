@@ -9,6 +9,6 @@ export interface Capture { id: number; sessionId: number; turnId: number | null;
 
 export interface SearchHit { turnId: number | null; captureId: number | null; sessionId: number; snippet: string; createdAt: number; }
 
-export interface ShortcutMap { scrollUp: string; scrollDown: string; prevPage: string; nextPage: string; }
-export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; opacity: number; shortcuts: ShortcutMap; }
+export interface ShortcutMap { scrollUp: string; scrollDown: string; prevPage: string; nextPage: string; captureRegion: string; }
+export interface ConfigData { ollamaUrl: string; model: string; hideFromCapture: boolean; opacity: number; sendScreen: boolean; shortcuts: ShortcutMap; }
 export interface PermissionStatus { screen: "granted" | "denied" | "not-determined"; }

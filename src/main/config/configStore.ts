@@ -5,11 +5,13 @@ export const DEFAULT_CONFIG: ConfigData = {
   model: "gemma4:26b",
   hideFromCapture: true,
   opacity: 1,
+  sendScreen: true,
   shortcuts: {
     scrollUp: "CommandOrControl+Shift+Up",
     scrollDown: "CommandOrControl+Shift+Down",
     prevPage: "CommandOrControl+Shift+Left",
     nextPage: "CommandOrControl+Shift+Right",
+    captureRegion: "CommandOrControl+Shift+2",
   },
 };
 

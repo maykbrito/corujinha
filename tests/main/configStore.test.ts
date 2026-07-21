@@ -30,4 +30,15 @@ describe("ConfigStore", () => {
     const cs = new ConfigStore(fakeDisk("{not json"));
     expect(cs.get()).toEqual(DEFAULT_CONFIG);
   });
+  it("defaults sendScreen to true and includes the captureRegion shortcut", () => {
+    const cs = new ConfigStore(fakeDisk());
+    const c = cs.get();
+    expect(c.sendScreen).toBe(true);
+    expect(c.shortcuts.captureRegion).toBe("CommandOrControl+Shift+2");
+  });
+  it("persists sendScreen through set", () => {
+    const cs = new ConfigStore(fakeDisk());
+    expect(cs.set({ sendScreen: false }).sendScreen).toBe(false);
+    expect(cs.get().sendScreen).toBe(false);
+  });
 });
