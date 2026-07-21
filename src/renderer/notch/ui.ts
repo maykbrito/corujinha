@@ -156,12 +156,16 @@ export function buildNotch(root: HTMLElement, actions: NotchActions): NotchRefs 
   // each element's title attribute.
   initTooltips([r.grip, r.newBtn, root.querySelector<HTMLElement>("#dash")!, r.settingsBtn, r.collapseBtn, r.send, r.screenToggle]);
 
+  let sending = false;
   const submit = async () => {
+    if (sending) return; // ponytail: Enter fires faster than send() resolves; guard re-entry
     const v = r.input.value.trim();
     if (!v) return;
+    sending = true;
     r.send.disabled = true;
     const ok = await actions.send(v);
     r.send.disabled = false;
+    sending = false;
     if (ok) r.input.value = ""; // keep the text on failure so the user can retry (spec §7)
     else r.input.focus();
   };
