@@ -1,0 +1,49 @@
+/* src/renderer/selection/styles.css */
+* { margin: 0; box-sizing: border-box; }
+html, body {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  cursor: crosshair;
+  /* Whole overlay dims the screen; the selection box punches a clear hole via box-shadow. */
+  background: rgba(0, 0, 0, 0.45);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  user-select: none;
+}
+
+#sel {
+  position: fixed;
+  border: 2px solid #6cccff;
+  border-radius: 2px;
+  /* clear inside + dim everything outside the selection */
+  background: transparent;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+}
+#sel[hidden] { display: none; }
+
+.dims {
+  position: absolute;
+  top: -20px;
+  left: 0;
+  background: #6cccff;
+  color: #00131f;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.hint {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #cbd3dd;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  pointer-events: none;
+}

@@ -20,6 +20,7 @@ export default defineConfig({
           dashboard: resolve("src/renderer/dashboard/index.html"),
           settings: resolve("src/renderer/settings/index.html"),
           captureWorker: resolve("src/renderer/captureWorker/index.html"),
+          selection: resolve("src/renderer/selection/index.html"),
         },
       },
     },
