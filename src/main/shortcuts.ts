@@ -29,6 +29,7 @@ function applyShortcuts(): void {
   const s = d.getConfig().shortcuts;
   reg("CommandOrControl+Shift+A", () => d.sendToNotch(IPC_EVENT.HOTKEY_ASK_NOW));
   reg("CommandOrControl+Shift+H", () => d.toggleNotch());
+  reg(s.captureRegion, () => d.sendToNotch(IPC_EVENT.HOTKEY_CAPTURE_REGION));
   reg(s.prevPage, () => d.sendToNotch(IPC_EVENT.NOTCH_PAGE, "prev"));
   reg(s.nextPage, () => d.sendToNotch(IPC_EVENT.NOTCH_PAGE, "next"));
   reg(s.scrollUp, () => d.sendToNotch(IPC_EVENT.NOTCH_SCROLL, "up"));
