@@ -24,7 +24,13 @@ export class ConfigStore {
     if (!raw) return { ...DEFAULT_CONFIG };
     try {
       const parsed = JSON.parse(raw) as Partial<ConfigData>;
-      return { ...DEFAULT_CONFIG, ...parsed };
+      // Deep-merge `shortcuts` so a legacy file missing a newer key (e.g. captureRegion)
+      // still gets the default for it, instead of the whole sub-object replacing the default.
+      return {
+        ...DEFAULT_CONFIG,
+        ...parsed,
+        shortcuts: { ...DEFAULT_CONFIG.shortcuts, ...parsed.shortcuts },
+      };
     } catch {
       return { ...DEFAULT_CONFIG };
     }

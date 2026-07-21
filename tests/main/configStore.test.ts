@@ -41,4 +41,10 @@ describe("ConfigStore", () => {
     expect(cs.set({ sendScreen: false }).sendScreen).toBe(false);
     expect(cs.get().sendScreen).toBe(false);
   });
+  it("fills missing nested shortcut keys from defaults (legacy config lacking captureRegion)", () => {
+    const cs = new ConfigStore(fakeDisk(JSON.stringify({ shortcuts: { scrollUp: "CommandOrControl+K" } })));
+    const c = cs.get();
+    expect(c.shortcuts.captureRegion).toBe("CommandOrControl+Shift+2"); // filled from default
+    expect(c.shortcuts.scrollUp).toBe("CommandOrControl+K"); // user value kept
+  });
 });
