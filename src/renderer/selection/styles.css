@@ -5,8 +5,9 @@ html, body {
   height: 100vh;
   overflow: hidden;
   cursor: crosshair;
-  /* Whole overlay dims the screen; the selection box punches a clear hole via box-shadow. */
-  background: rgba(0, 0, 0, 0.45);
+  /* No baseline dim — only the selection box dims what's OUTSIDE it (single layer),
+     so the selected area stays fully crisp (crosshair + hint signal the overlay is active). */
+  background: transparent;
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   user-select: none;
 }
@@ -15,9 +16,9 @@ html, body {
   position: fixed;
   border: 2px solid #3ddc6d;
   border-radius: 2px;
-  /* clear inside + dim everything outside the selection */
+  /* clear inside + gently dim everything outside the selection */
   background: transparent;
-  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.22);
 }
 #sel[hidden] { display: none; }
 
