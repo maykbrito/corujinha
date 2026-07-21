@@ -1,6 +1,6 @@
 {
   "name": "corujinha",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "AI companion that lives in a corner of your screen, sees what you're doing and helps — local and private",
   "main": "out/main/index.js",
   "license": "MIT",
